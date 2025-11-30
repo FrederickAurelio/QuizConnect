@@ -1,4 +1,4 @@
-import { deleteQuiz, type QuizListItem } from "@/api/quiz";
+import { copyQuiz, deleteQuiz, type QuizListItem } from "@/api/quiz";
 import { Button } from "@/components/ui/button";
 import {
   Popover,
@@ -9,6 +9,7 @@ import { handleGeneralError, handleGeneralSuccess } from "@/lib/axios";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   CircleQuestionMark,
+  Copy,
   Edit2,
   EllipsisVertical,
   Pencil,
@@ -28,10 +29,11 @@ function QuizCard({ quiz }: Props) {
   const [openMenu, setOpenMenu] = useState(false);
   const queryClient = useQueryClient();
 
-  const { mutate, isPending } = useMutation({
+  const deleteMutation = useMutation({
     mutationFn: deleteQuiz,
     onSuccess: (resData) => {
       handleGeneralSuccess(resData);
+      setOpenMenu(false);
       queryClient.setQueriesData({ queryKey: ["quizzes"] }, (oldData: any) => {
         if (!oldData) return oldData;
 
@@ -46,7 +48,40 @@ function QuizCard({ quiz }: Props) {
           })),
         };
       });
+    },
+    onError: handleGeneralError,
+  });
+
+  const copyMutation = useMutation({
+    mutationFn: copyQuiz,
+    onSuccess: (resData) => {
       setOpenMenu(false);
+      setTimeout(() => {
+        handleGeneralSuccess(resData);
+        queryClient.setQueriesData(
+          { queryKey: ["quizzes"] },
+          (oldData: any) => {
+            const newQuiz = resData.data;
+            if (!oldData || !newQuiz) return oldData;
+
+            return {
+              ...oldData,
+              pages: oldData.pages.map((page: any, i: number) => {
+                return {
+                  ...page,
+                  data: {
+                    ...page.data,
+                    data:
+                      i === 0 ? [newQuiz, ...page.data.data] : page.data.data,
+                  },
+                };
+              }),
+            };
+          }
+        );
+        const el = document.getElementById("quiz-set-scroll");
+        el?.scrollTo({ top: 0, behavior: "smooth" });
+      }, 300);
     },
     onError: handleGeneralError,
   });
@@ -56,7 +91,10 @@ function QuizCard({ quiz }: Props) {
     navigate(`/edit/${quiz._id}`);
   };
   const handleDelete = async () => {
-    mutate(quiz._id);
+    deleteMutation.mutate(quiz._id);
+  };
+  const handleCopy = async () => {
+    copyMutation.mutate(quiz._id);
   };
 
   return (
@@ -76,7 +114,7 @@ function QuizCard({ quiz }: Props) {
             <Button
               variant="ghost"
               className="flex items-center justify-start gap-2 text-sm p-1 px-2 cursor-default hover:text-primary"
-              disabled={isPending}
+              disabled={deleteMutation.isPending || copyMutation.isPending}
               onClick={handleEdit}
             >
               <Edit2 size={12} />
@@ -84,8 +122,17 @@ function QuizCard({ quiz }: Props) {
             </Button>
             <Button
               variant="ghost"
+              className="flex items-center justify-start gap-2 text-sm p-1 px-2 cursor-default hover:text-chart-4"
+              disabled={deleteMutation.isPending || copyMutation.isPending}
+              onClick={handleCopy}
+            >
+              <Copy size={12} />
+              Copy
+            </Button>
+            <Button
+              variant="ghost"
               className="flex items-center justify-start gap-2 text-sm p-1 px-2 cursor-default hover:text-destructive"
-              disabled={isPending}
+              disabled={deleteMutation.isPending || copyMutation.isPending}
               onClick={handleDelete}
             >
               <Trash2 size={12} />

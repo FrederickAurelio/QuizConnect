@@ -92,7 +92,10 @@ function QuizSetPage() {
       </div>
 
       {/* Content */}
-      <div className="flex flex-col w-full py-2 pb-1 overflow-y-auto scroll-primary">
+      <div
+        className="flex flex-col w-full py-2 pb-1 overflow-y-auto scroll-primary"
+        id="quiz-set-scroll"
+      >
         <div
           className="grid gap-2"
           ref={containerRef}

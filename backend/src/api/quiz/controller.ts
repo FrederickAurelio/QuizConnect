@@ -140,6 +140,45 @@ export const deleteQuiz = async (req: Request, res: Response) => {
   }
 };
 
+// ---------------- COPY ----------------
+export const copyQuiz = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const userId = req.session.userId;
+
+    if (!userId) {
+      return res.status(401).json({
+        message: "Unauthorized!",
+        data: null,
+        errors: null,
+      });
+    }
+
+    const quiz = await Quiz.findOne({
+      _id: new Types.ObjectId(id),
+      creatorId: new Types.ObjectId(userId),
+    });
+
+    const newQuiz = new Quiz({
+      title: `${quiz?.title}-Copy`,
+      description: quiz?.description,
+      questions: quiz?.questions,
+      draft: quiz?.draft,
+      creatorId: userId,
+    });
+
+    await newQuiz.save();
+
+    return res.status(201).json({
+      message: "Quiz copied successfully",
+      data: newQuiz,
+      errors: null,
+    });
+  } catch (error) {
+    return handleControllerError(res, error);
+  }
+};
+
 // ---------------- GET QUIZZES WITH PAGINATION (Aggregation) ----------------
 export const getQuizzes = async (req: Request, res: Response) => {
   try {

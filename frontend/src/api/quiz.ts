@@ -39,6 +39,11 @@ export const deleteQuiz = async (quizId: string) => {
   return res.data;
 };
 
+export const copyQuiz = async (quizId: string) => {
+  const res = await api.post<ApiResponse<QuizBackend>>(`/quiz/copy/${quizId}`);
+  return res.data;
+};
+
 type getQuizzesRequest = ApiRequestQuery & {
   draftOnly?: boolean;
   readyOnly?: boolean;
