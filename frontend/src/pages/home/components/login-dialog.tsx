@@ -97,7 +97,7 @@ type FormData = LoginFormData | RegisterFormData | ForgotFormData;
 function LoginDialog({ open, onOpenChange }: Props) {
   const { setUser, closeLogin } = useLogin();
   const [option, setOption] = useState<"login" | "register" | "forgot">(
-    "register"
+    "register",
   );
   const [timer, setTimer] = useState(0);
 
@@ -106,8 +106,8 @@ function LoginDialog({ open, onOpenChange }: Props) {
       option === "login"
         ? loginSchema
         : option === "register"
-        ? registerSchema
-        : forgotSchema
+          ? registerSchema
+          : forgotSchema,
     ),
     defaultValues: {
       email: "",
@@ -217,18 +217,18 @@ function LoginDialog({ open, onOpenChange }: Props) {
 
   return (
     <Dialog onOpenChange={onOpenChange} open={open}>
-      <DialogContent className="max-w-[460px]! flex flex-col">
-        <DialogTitle className="text-center font-semibold text-secondary-foreground">
+      <DialogContent className="flex max-w-[460px]! flex-col">
+        <DialogTitle className="text-secondary-foreground text-center font-semibold">
           <span className="text-primary">Quiz</span>Connect
         </DialogTitle>
         {/* TABS */}
-        <div className="flex h-fit items-center gap-1 bg-card p-1 rounded-xl">
+        <div className="bg-card flex h-fit items-center gap-1 rounded-xl p-1">
           {(option === "forgot" ? forgotTabs : tabs).map((tab) => (
             <div
               key={tab.value}
               className={`${
                 tab.value === "forgot" ? "flex-[1.8]" : "flex-1"
-              } font-semibold py-1.5 rounded-lg flex justify-center transition-colors duration-200 cursor-pointer ${
+              } flex cursor-pointer justify-center rounded-lg py-1.5 font-semibold transition-colors duration-200 ${
                 option === tab.value
                   ? "bg-primary text-primary-foreground"
                   : "text-white/60"
@@ -375,10 +375,10 @@ function LoginDialog({ open, onOpenChange }: Props) {
             {/* BUTTON */}
             <div className="flex flex-col gap-1">
               {option === "login" && (
-                <div className="w-full flex justify-end">
+                <div className="flex w-full justify-end">
                   <Button
                     type="button"
-                    className="text-sm cursor-pointer  transition-colors duration-75 pr-2"
+                    className="cursor-pointer pr-2 text-sm transition-colors duration-75"
                     variant="link"
                     onClick={() => {
                       setOption("forgot");
@@ -389,7 +389,7 @@ function LoginDialog({ open, onOpenChange }: Props) {
                 </div>
               )}
               <Button
-                className="w-full mt-1 font-semibold"
+                className="mt-1 w-full font-semibold"
                 type="submit"
                 disabled={
                   registerMutation.isPending ||
@@ -400,8 +400,8 @@ function LoginDialog({ open, onOpenChange }: Props) {
                 {option === "login"
                   ? "Login"
                   : option === "register"
-                  ? "Register"
-                  : "Reset Password"}
+                    ? "Register"
+                    : "Reset Password"}
               </Button>
             </div>
           </form>

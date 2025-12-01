@@ -66,21 +66,21 @@ function QuizSetPage() {
   }, [inView, isFetchingNextPage, hasNextPage, fetchNextPage]);
 
   return (
-    <div className="w-full h-full pt-4 px-4 flex flex-col gap-2">
+    <div className="flex h-full w-full flex-col gap-2 px-4 pt-4">
       {/* Header */}
-      <div className="flex items-end justify-between shrink-0">
+      <div className="flex shrink-0 items-end justify-between">
         <div className="flex flex-col">
           <h1 className="text-3xl font-bold">My Library</h1>
           <p className="text-white/60">Manage your quizzes and host live.</p>
         </div>
 
-        <div className="flex items-center border border-border bg-card p-1 rounded-lg">
+        <div className="border-border bg-card flex items-center rounded-lg border p-1">
           {tabs.map((tab) => (
             <div
               key={tab.key}
-              className={`w-16 py-1 text-center text-sm cursor-default transition-colors duration-100 font-semibold ${
+              className={`w-16 cursor-default py-1 text-center text-sm font-semibold transition-colors duration-100 ${
                 option === tab.key
-                  ? "bg-border rounded-md text-secondary-foreground"
+                  ? "bg-border text-secondary-foreground rounded-md"
                   : "text-white/40"
               }`}
               onClick={() => setOption(tab.key)}
@@ -93,7 +93,7 @@ function QuizSetPage() {
 
       {/* Content */}
       <div
-        className="flex flex-col w-full py-2 pb-1 overflow-y-auto scroll-primary"
+        className="scroll-primary flex w-full flex-col overflow-y-auto py-2 pb-1"
         id="quiz-set-scroll"
       >
         <div
@@ -108,7 +108,7 @@ function QuizSetPage() {
         </div>
         {(hasNextPage || isFetchingNextPage) && (
           <div
-            className="flex items-center shrink-0 h-12 justify-center text-primary"
+            className="text-primary flex h-12 shrink-0 items-center justify-center"
             ref={ref}
           >
             {isFetchingNextPage && (

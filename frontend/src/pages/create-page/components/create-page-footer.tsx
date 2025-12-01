@@ -69,8 +69,8 @@ function CreatePageFooter({ form, editMode, quizId }: Props) {
   });
 
   return (
-    <div className="flex-1 min-h-fit flex items-end shrink-0">
-      <div className="flex items-center w-full justify-between border-t border-border py-3 pb-5 px-2">
+    <div className="flex min-h-fit flex-1 shrink-0 items-end">
+      <div className="border-border flex w-full items-center justify-between border-t px-2 py-3 pb-5">
         <div className="flex flex-col">
           <p
             className={`font-semibold transition-colors ${
@@ -105,7 +105,7 @@ function CreatePageFooter({ form, editMode, quizId }: Props) {
               disabled={createMutation.isPending || updateMutation.isPending}
               type="button"
               size="lg"
-              className={`font-semibold flex items-center transition-all`}
+              className={`flex items-center font-semibold transition-all`}
               onClick={submitQuiz}
             >
               <Rocket strokeWidth={2} />

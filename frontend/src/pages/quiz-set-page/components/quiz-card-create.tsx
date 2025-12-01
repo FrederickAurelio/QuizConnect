@@ -8,13 +8,13 @@ function QuizCardCreate() {
   };
   return (
     <div
-      className={`border-border hover:-translate-y-[2px] hover:shadow-2xl hover:shadow-primary hover:drop-shadow-2xl transition-all duration-200 border rounded-xl p-5 flex flex-col justify-center items-center gap-4 h-[242px] border-dashed shrink-0`}
+      className={`border-border hover:shadow-primary flex h-[242px] shrink-0 flex-col items-center justify-center gap-4 rounded-xl border border-dashed p-5 transition-all duration-200 hover:-translate-y-[2px] hover:shadow-2xl hover:drop-shadow-2xl`}
       onClick={handleClick}
     >
-      <div className="bg-secondary p-3 rounded-full">
+      <div className="bg-secondary rounded-full p-3">
         <Plus className="text-secondary-foreground" size={28} />
       </div>
-      <div className="flex flex-col leading-none items-center">
+      <div className="flex flex-col items-center leading-none">
         <h2 className="text-lg font-semibold">Create New Quiz</h2>
         <p className="text-white/60">Make a new quiz for your players</p>
       </div>

@@ -77,7 +77,7 @@ function QuizCard({ quiz }: Props) {
                 };
               }),
             };
-          }
+          },
         );
         const el = document.getElementById("quiz-set-scroll");
         el?.scrollTo({ top: 0, behavior: "smooth" });
@@ -90,6 +90,10 @@ function QuizCard({ quiz }: Props) {
     setOpenMenu(false);
     navigate(`/edit/${quiz._id}`);
   };
+  const handleHost = () => {
+    setOpenMenu(false);
+    navigate(`/host/${quiz._id}`);
+  };
   const handleDelete = async () => {
     deleteMutation.mutate(quiz._id);
   };
@@ -99,21 +103,21 @@ function QuizCard({ quiz }: Props) {
 
   return (
     <div
-      className={`relative border-border hover:-translate-y-[2px] hover:shadow-2xl hover:shadow-primary hover:drop-shadow-2xl transition-all duration-200 border rounded-xl p-5 flex flex-col justify-between gap-4 h-[242px] ${
+      className={`border-border hover:shadow-primary relative flex h-[242px] flex-col justify-between gap-4 rounded-xl border p-5 transition-all duration-200 hover:-translate-y-[2px] hover:shadow-2xl hover:drop-shadow-2xl ${
         quiz.draft ? "border-dashed" : "bg-card"
       }`}
     >
-      <div className="absolute right-3 top-3">
+      <div className="absolute top-3 right-3">
         <Popover open={openMenu} onOpenChange={setOpenMenu}>
           <PopoverTrigger className="hover:text-white/60">
             <Button variant="ghost" size="icon-sm">
               <EllipsisVertical size={16} />
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="w-fit flex flex-col p-0" side="top">
+          <PopoverContent className="flex w-fit flex-col p-0" side="top">
             <Button
               variant="ghost"
-              className="flex items-center justify-start gap-2 text-sm p-1 px-2 cursor-default hover:text-primary"
+              className="hover:text-primary flex cursor-default items-center justify-start gap-2 p-1 px-2 text-sm"
               disabled={deleteMutation.isPending || copyMutation.isPending}
               onClick={handleEdit}
             >
@@ -122,7 +126,7 @@ function QuizCard({ quiz }: Props) {
             </Button>
             <Button
               variant="ghost"
-              className="flex items-center justify-start gap-2 text-sm p-1 px-2 cursor-default hover:text-chart-4"
+              className="hover:text-chart-4 flex cursor-default items-center justify-start gap-2 p-1 px-2 text-sm"
               disabled={deleteMutation.isPending || copyMutation.isPending}
               onClick={handleCopy}
             >
@@ -131,7 +135,7 @@ function QuizCard({ quiz }: Props) {
             </Button>
             <Button
               variant="ghost"
-              className="flex items-center justify-start gap-2 text-sm p-1 px-2 cursor-default hover:text-destructive"
+              className="hover:text-destructive flex cursor-default items-center justify-start gap-2 p-1 px-2 text-sm"
               disabled={deleteMutation.isPending || copyMutation.isPending}
               onClick={handleDelete}
             >
@@ -143,21 +147,21 @@ function QuizCard({ quiz }: Props) {
       </div>
 
       <div className="flex flex-col gap-1">
-        <h1 className="font-semibold  text-2xl line-clamp-2">{quiz.title}</h1>
-        <p className="opacity-60 line-clamp-3">{quiz.description}</p>
+        <h1 className="line-clamp-2 text-2xl font-semibold">{quiz.title}</h1>
+        <p className="line-clamp-3 opacity-60">{quiz.description}</p>
       </div>
 
-      <div className="border-border border-t pt-4 px-3 w-full flex items-center justify-between">
+      <div className="border-border flex w-full items-center justify-between border-t px-3 pt-4">
         {quiz.draft ? (
-          <div className="flex items-center  gap-1 text-white/50">
+          <div className="flex items-center gap-1 text-white/50">
             <Text className="-translate-y-px" size={16} strokeWidth={3} />
             <p className="text-sm leading-none font-bold">Draft</p>
-            <p className="text-xs translate-y-px font-normal">
+            <p className="translate-y-px text-xs font-normal">
               {quiz.questionCount} Qs
             </p>
           </div>
         ) : (
-          <div className="flex items-center  gap-1 text-white/50">
+          <div className="flex items-center gap-1 text-white/50">
             <CircleQuestionMark size={16} strokeWidth={3} />
             <p className="text-sm leading-none font-bold">
               {quiz.questionCount} Qs
@@ -169,14 +173,18 @@ function QuizCard({ quiz }: Props) {
           <Button
             size="sm"
             variant="secondary"
-            className="font-semibold h-7 flex items-center"
+            className="flex h-7 items-center font-semibold"
             onClick={handleEdit}
           >
             <Pencil strokeWidth={3} />
             <span>Continue</span>
           </Button>
         ) : (
-          <Button size="sm" className="font-semibold h-7 flex items-center ">
+          <Button
+            size="sm"
+            className="flex h-7 items-center font-semibold"
+            onClick={handleHost}
+          >
             <Play strokeWidth={3} />
             <span>Host</span>
           </Button>

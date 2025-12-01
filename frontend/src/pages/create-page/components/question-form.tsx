@@ -30,17 +30,17 @@ function QuestionForm({ q, qIndex, remove, form }: Props) {
   return (
     <div
       key={q.id}
-      className={`flex flex-col gap-3 p-4 transition-colors duration-150 border rounded-lg hover:border-primary border-border bg-card`}
+      className={`hover:border-primary border-border bg-card flex flex-col gap-3 rounded-lg border p-4 transition-colors duration-150`}
     >
       <div className="flex items-center justify-between">
-        <h2 className="flex items-center text-primary gap-2">
+        <h2 className="text-primary flex items-center gap-2">
           <Edit3 size={16} />
           Editing Questions {qIndex + 1}
         </h2>
         <Button
           variant="ghost"
           size="icon-sm"
-          className="text-white/60 hover:text-destructive/80 transition-colors duration-150 p-[6px] rounded-md"
+          className="hover:text-destructive/80 rounded-md p-[6px] text-white/60 transition-colors duration-150"
           onClick={() => {
             remove(q.id);
           }}
@@ -55,11 +55,11 @@ function QuestionForm({ q, qIndex, remove, form }: Props) {
         name={`questions.${qIndex}.question`}
         render={({ field }) => (
           <FormItem>
-            <FormLabel className="text-white/60 text-xs">QUESTION</FormLabel>
+            <FormLabel className="text-xs text-white/60">QUESTION</FormLabel>
             <FormControl>
               <div className="flex items-center gap-1">
                 <Textarea
-                  className="bg-background! text-lg! resize-none"
+                  className="bg-background! resize-none text-lg!"
                   {...field}
                 />
               </div>
@@ -88,7 +88,7 @@ function QuestionForm({ q, qIndex, remove, form }: Props) {
                       <FormItem>
                         <FormControl>
                           <div
-                            className={`flex h-fit flex-row items-center space-x-3 space-y-0 rounded-md border px-3 bg-background ${
+                            className={`bg-background flex h-fit flex-row items-center space-y-0 space-x-3 rounded-md border px-3 ${
                               fieldCorrectKey.value === key
                                 ? "border-primary/80"
                                 : ""
@@ -100,7 +100,7 @@ function QuestionForm({ q, qIndex, remove, form }: Props) {
                             />
                             <Input
                               placeholder={`Option ${key}`}
-                              className={`border-0 focus-visible:ring-0 p-0 ${
+                              className={`border-0 p-0 focus-visible:ring-0 ${
                                 fieldCorrectKey.value === key
                                   ? "text-primary"
                                   : ""
@@ -127,7 +127,7 @@ function QuestionForm({ q, qIndex, remove, form }: Props) {
           </FormItem>
         )}
       />
-      <div className="flex items-center font-semibold justify-end pr-px">
+      <div className="flex items-center justify-end pr-px font-semibold">
         <Button
           type="button"
           disabled={notFilled}

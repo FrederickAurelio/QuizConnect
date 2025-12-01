@@ -11,10 +11,10 @@ function AddNewQuestionBtn({ onClick }: Props) {
       type="button"
       variant="ghost"
       size="lg"
-      className="font-semibold text-lg! mb-2 border flex flex-col justify-center items-center gap-2 border-dashed shrink-0 text-white/40 py-4! h-fit hover:text-white/60 duration-150"
+      className="mb-2 flex h-fit shrink-0 flex-col items-center justify-center gap-2 border border-dashed py-4! text-lg! font-semibold text-white/40 duration-150 hover:text-white/60"
       onClick={onClick}
     >
-      <div className="bg-secondary p-2 rounded-full">
+      <div className="bg-secondary rounded-full p-2">
         <Plus className="text-secondary-foreground" size={28} />
       </div>
       Add Question

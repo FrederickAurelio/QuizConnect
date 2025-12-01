@@ -107,8 +107,8 @@ function CreatePage({ editMode = false, editData }: Props) {
   };
 
   return (
-    <div className="w-full h-full pt-2 px-4 flex flex-col gap-2">
-      <div className="bg-card border-border border rounded-full w-fit px-4 py-1 font-semibold flex items-center gap-2 mb-3 text-lg">
+    <div className="flex h-full w-full flex-col gap-2 px-4 pt-2">
+      <div className="bg-card border-border mb-3 flex w-fit items-center gap-2 rounded-full border px-4 py-1 text-lg font-semibold">
         <button
           className="hover:text-primary"
           onClick={() => {
@@ -128,7 +128,7 @@ function CreatePage({ editMode = false, editData }: Props) {
             <FormItem>
               <FormControl>
                 <Input
-                  className="border-0 rounded-none border-b-2 border-transparent text-3xl! font-semibold focus:border-primary focus:outline-none transition-all duration-200"
+                  className="focus:border-primary rounded-none border-0 border-b-2 border-transparent text-3xl! font-semibold transition-all duration-200 focus:outline-none"
                   {...field}
                 />
               </FormControl>
@@ -145,7 +145,7 @@ function CreatePage({ editMode = false, editData }: Props) {
             <FormItem>
               <FormControl>
                 <Textarea
-                  className="bg-transparent! text-lg! resize-none border-0 rounded-none border-b-2 border-transparent focus:border-primary focus:outline-none transition-all duration-200 focus-visible:ring-0"
+                  className="focus:border-primary resize-none rounded-none border-0 border-b-2 border-transparent bg-transparent! text-lg! transition-all duration-200 focus:outline-none focus-visible:ring-0"
                   placeholder="Add a description for the quiz context"
                   {...field}
                 />
@@ -157,7 +157,7 @@ function CreatePage({ editMode = false, editData }: Props) {
 
         {/* QUESTIONS */}
         <div
-          className="flex flex-col gap-3 overflow-y-auto scroll-primary"
+          className="scroll-primary flex flex-col gap-3 overflow-y-auto"
           ref={scrollBoxRef}
         >
           {questions.map((q, qIndex) =>
@@ -177,7 +177,7 @@ function CreatePage({ editMode = false, editData }: Props) {
                 qIndex={qIndex}
                 remove={remove}
               />
-            )
+            ),
           )}
           {/* Add New Question */}
           <AddNewQuestionBtn onClick={() => append(createNewQuestion())} />

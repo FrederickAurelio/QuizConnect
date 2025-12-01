@@ -22,7 +22,8 @@ export default defineConfig([
     rules: {
       // Disable the Fast Refresh only-export-components warning
       'react-refresh/only-export-components': 'off',
-      "@typescript-eslint/no-explicit-any": "off"
+      "@typescript-eslint/no-explicit-any": "off",
+      "tailwindcss/classnames-order": "error"
     },
   },
 ])

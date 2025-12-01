@@ -63,10 +63,10 @@ function AvatarMenu() {
     <Popover open={openMenu}>
       <PopoverAnchor>
         <div
-          className="bg-card p-1.5 rounded-xl px-2 flex items-center justify-between gap-2 w-60 border border-border"
+          className="bg-card border-border flex w-60 items-center justify-between gap-2 rounded-xl border p-1.5 px-2"
           onClick={() => setOpenMenu((prev) => !prev)}
         >
-          <div className="flex items-center gap-2 min-w-0">
+          <div className="flex min-w-0 items-center gap-2">
             <Avatar className="size-10 p-2">
               <AvatarImage src={user?.avatar ?? ""} />
               <AvatarFallback>
@@ -77,7 +77,7 @@ function AvatarMenu() {
                   .join("")}
               </AvatarFallback>
             </Avatar>
-            <p className="text-sm font-semibold truncate">{user?.username}</p>
+            <p className="truncate text-sm font-semibold">{user?.username}</p>
           </div>
           <ChevronDown
             className={`${
@@ -88,30 +88,30 @@ function AvatarMenu() {
         </div>
       </PopoverAnchor>
 
-      <PopoverContent className="w-(--radix-popover-trigger-width) p-2 flex flex-col">
+      <PopoverContent className="flex w-(--radix-popover-trigger-width) flex-col p-2">
         <div
-          className="font-semibold flex items-center gap-2 p-2 rounded-md hover:bg-accent/40 text-sm cursor-default"
+          className="hover:bg-accent/40 flex cursor-default items-center gap-2 rounded-md p-2 text-sm font-semibold"
           onClick={() => handleMenuClick("edit")}
         >
           <Pen size={16} strokeWidth={2} />
           Edit Profile
         </div>
         <div
-          className="font-semibold flex items-center gap-2 p-2 rounded-md hover:bg-accent/40 text-sm cursor-default"
+          className="hover:bg-accent/40 flex cursor-default items-center gap-2 rounded-md p-2 text-sm font-semibold"
           onClick={() => handleMenuClick("history")}
         >
           <History size={16} strokeWidth={2} />
           History
         </div>
         <div
-          className="font-semibold flex items-center gap-2 p-2 rounded-md hover:bg-accent/40 text-sm cursor-default"
+          className="hover:bg-accent/40 flex cursor-default items-center gap-2 rounded-md p-2 text-sm font-semibold"
           onClick={() => handleMenuClick("quiz")}
         >
           <ScrollText size={16} strokeWidth={2} />
           My Quiz Sets
         </div>
         <div
-          className="font-semibold flex items-center gap-2 p-2 rounded-md hover:bg-accent/40 text-sm text-destructive cursor-default"
+          className="hover:bg-accent/40 text-destructive flex cursor-default items-center gap-2 rounded-md p-2 text-sm font-semibold"
           onClick={() => handleMenuClick("logout")}
         >
           <LogOut size={16} strokeWidth={2} />

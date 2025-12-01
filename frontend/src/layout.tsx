@@ -6,10 +6,10 @@ import { Outlet } from "react-router";
 function Layout() {
   const { isLoginDialogOpen, closeLogin } = useLogin();
   return (
-    <div className="flex flex-col h-dvh overflow-hidden">
+    <div className="flex h-dvh flex-col overflow-hidden">
       <Header />
-      <div className="w-full flex-1 min-h-0 flex flex-col items-center ">
-        <div className="w-full flex-1 min-h-0 max-w-[1200px]">
+      <div className="flex min-h-0 w-full flex-1 flex-col items-center">
+        <div className="min-h-0 w-full max-w-[1200px] flex-1">
           <Outlet />
         </div>
       </div>

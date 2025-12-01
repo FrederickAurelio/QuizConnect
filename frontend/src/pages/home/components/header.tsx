@@ -13,10 +13,10 @@ function Header() {
   };
 
   return (
-    <div className="flex justify-center items-center gap-1 h-20 border-b border-border mx-10 relative shrink-0">
+    <div className="border-border relative mx-10 flex h-20 shrink-0 items-center justify-center gap-1 border-b">
       <div className="flex items-center gap-1" onClick={handleClickLogo}>
-        <Gamepad className="size-12 text-primary -translate-y-px" />
-        <h1 className="text-3xl font-semibold text-secondary-foreground cursor-default">
+        <Gamepad className="text-primary size-12 -translate-y-px" />
+        <h1 className="text-secondary-foreground cursor-default text-3xl font-semibold">
           <span className="text-primary">Quiz</span>Connect
         </h1>
       </div>
