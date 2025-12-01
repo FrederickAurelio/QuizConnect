@@ -57,7 +57,15 @@ function CreatePageFooter({ form, editMode, quizId }: Props) {
       toast.info("You must add at least 3 questions to create a quiz.");
       return;
     }
-    createMutation.mutate({ ...data, draft: false });
+    const finalData = { ...data, draft: false };
+    if (editMode && quizId) {
+      updateMutation.mutate({
+        data: finalData,
+        quizId: quizId,
+      });
+    } else {
+      createMutation.mutate(finalData);
+    }
   });
 
   return (
