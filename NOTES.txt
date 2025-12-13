@@ -1,0 +1,11 @@
+missing:
+- Copy Question
+- Edit Profile
+
+Kerjaan Host Page
+
+Chatgpt has table design for game records.
+
+
+API KEY
+******

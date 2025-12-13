@@ -8,29 +8,45 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import clsx from "clsx";
 import { Minus, Plus, SlidersHorizontal } from "lucide-react";
-import { useState } from "react";
 
-function GameSettings() {
-  const totalAvailableQuestions = 12;
-
-  // Centralized State
-  const [settings, setSettings] = useState({
-    maxPlayers: 8,
-    questionCount: totalAvailableQuestions,
-    shuffleQuestions: true,
-    shuffleAnswers: false,
-    questionTime: "30",
-    cooldownTime: "5",
-  });
-
-  // Helper to update state
-  const updateSetting = (key: keyof typeof settings, value: any) => {
-    setSettings((prev) => ({ ...prev, [key]: value }));
+type GameSettingsProps = {
+  isHost: boolean;
+  totalAvailableQuestions: number;
+  settings: {
+    maxPlayers: number;
+    questionCount: number;
+    shuffleQuestions: boolean;
+    shuffleAnswers: boolean;
+    questionTime: string;
+    cooldownTime: string;
   };
+  updateSetting: (
+    key:
+      | "maxPlayers"
+      | "questionCount"
+      | "shuffleQuestions"
+      | "shuffleAnswers"
+      | "questionTime"
+      | "cooldownTime",
+    value: any,
+  ) => void;
+};
 
+function GameSettings({
+  isHost,
+  totalAvailableQuestions,
+  settings,
+  updateSetting,
+}: GameSettingsProps) {
   return (
-    <div className="bg-sidebar border-border col-span-1 m-10 ml-0 flex min-h-0 w-full flex-1 flex-col gap-6 rounded-2xl border px-5 py-5">
+    <div
+      className={clsx(
+        "bg-sidebar border-border col-span-1 m-10 ml-0 flex min-h-0 w-full flex-1 flex-col gap-6 rounded-2xl border px-5 py-5",
+        !isHost && "pointer-events-none opacity-75",
+      )}
+    >
       <div className="text-secondary-foreground/50 flex items-center gap-2">
         <SlidersHorizontal size={20} />
         <h1 className="text-lg font-medium">Game Settings</h1>
@@ -186,7 +202,7 @@ function GameSettings() {
       </div>
 
       <div className="mt-auto pt-4">
-        <Button className="w-full font-bold" size="lg">
+        <Button disabled={!isHost} className="w-full font-bold" size="lg">
           START GAME
         </Button>
       </div>
