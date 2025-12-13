@@ -13,6 +13,7 @@ import { RouterProvider } from "react-router/dom";
 import { toast } from "sonner";
 import "./index.css";
 import EditPage from "@/pages/edit-page";
+import LobbyPage from "@/pages/lobby-page.tsx";
 
 // -------------------- Private Route --------------------
 function PrivateRoute({ children }: { children: React.ReactNode }) {
@@ -68,6 +69,14 @@ function AppRouter() {
           element: (
             <PrivateRoute>
               <EditPage />
+            </PrivateRoute>
+          ),
+        },
+        {
+          path: "/host/:quizId",
+          element: (
+            <PrivateRoute>
+              <LobbyPage />
             </PrivateRoute>
           ),
         },
