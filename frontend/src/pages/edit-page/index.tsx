@@ -1,21 +1,22 @@
 import { getDetailQuiz } from "@/api/quiz";
+import { handleGeneralError } from "@/lib/axios";
 import CreatePage from "@/pages/create-page";
 import LoadingPage from "@/pages/loading-page";
 import { useQuery } from "@tanstack/react-query";
 import { Navigate, useParams } from "react-router";
-import { toast } from "sonner";
 
 function EditPage() {
   const { quizId } = useParams();
-  const { data, isPending, isLoading, isFetched, isFetching } = useQuery({
-    queryKey: ["quizDetail", quizId],
-    queryFn: () => getDetailQuiz(quizId!),
-    enabled: !!quizId,
-    staleTime: 0,
-    gcTime: 0,
-    refetchOnMount: "always",
-    refetchOnWindowFocus: false,
-  });
+  const { data, isPending, isLoading, isFetched, isFetching, isError, error } =
+    useQuery({
+      queryKey: ["quizDetail", quizId],
+      queryFn: () => getDetailQuiz(quizId!),
+      enabled: !!quizId,
+      staleTime: 0,
+      gcTime: 0,
+      refetchOnMount: "always",
+      refetchOnWindowFocus: false,
+    });
 
   if (!quizId) return <Navigate to="/quiz-set" replace />;
   if (isPending || isLoading || !isFetched || isFetching)
@@ -23,8 +24,8 @@ function EditPage() {
 
   const quiz = data?.data;
 
-  if (!quiz) {
-    toast.error(data?.message);
+  if (!quiz || isError) {
+    handleGeneralError(error as any);
     return <Navigate to="/quiz-set" replace />;
   }
 

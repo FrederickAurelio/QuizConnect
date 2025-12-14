@@ -6,3 +6,7 @@ export function generateTempId(length = 8) {
   }
   return `guest_${result}`;
 }
+
+export function generateGameCode() {
+  return Math.random().toString(36).substring(2, 8).toUpperCase();
+}

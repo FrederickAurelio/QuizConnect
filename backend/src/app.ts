@@ -8,6 +8,10 @@ import cors from "cors";
 import dotenv from "dotenv";
 import authRoute from "./api/auth/router.js";
 import quizRouter from "./api/quiz/router.js";
+import { connectRedis, redis } from "./utils/redis.js";
+import { setupSocket } from "./utils/socket.js";
+import http from "http";
+import sessionRouter from "./api/sessions/router.js";
 
 dotenv.config();
 
@@ -55,8 +59,16 @@ app.use(
   })
 );
 
+const server = http.createServer(app);
+
+// Redis
+connectRedis();
+// WebSocket
+setupSocket(server);
+
 app.use("/auth", authRoute);
 app.use("/quiz", quizRouter);
+app.use("/sessions", sessionRouter);
 
 // Middleware to refresh session expiration
 app.use((req: Request, res: Response, next: NextFunction) => {

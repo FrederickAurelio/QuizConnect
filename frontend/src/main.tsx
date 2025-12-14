@@ -13,7 +13,7 @@ import { RouterProvider } from "react-router/dom";
 import { toast } from "sonner";
 import "./index.css";
 import EditPage from "@/pages/edit-page";
-import LobbyPage from "@/pages/lobby-page.tsx";
+import LobbyPageRoute from "@/pages/lobby-page.tsx/lobby-page-route";
 
 // -------------------- Private Route --------------------
 function PrivateRoute({ children }: { children: React.ReactNode }) {
@@ -73,10 +73,10 @@ function AppRouter() {
           ),
         },
         {
-          path: "/host/:quizId",
+          path: "/host/:gameCode",
           element: (
             <PrivateRoute>
-              <LobbyPage />
+              <LobbyPageRoute />
             </PrivateRoute>
           ),
         },
@@ -100,5 +100,5 @@ createRoot(document.getElementById("root")!).render(
       </LoginProvider>
     </QueryClientProvider>
     <Toaster position="top-center" />
-  </StrictMode>
+  </StrictMode>,
 );

@@ -1,4 +1,5 @@
 import { copyQuiz, deleteQuiz, type QuizListItem } from "@/api/quiz";
+import { hostQuiz } from "@/api/sessions";
 import { Button } from "@/components/ui/button";
 import {
   Popover,
@@ -86,13 +87,23 @@ function QuizCard({ quiz }: Props) {
     onError: handleGeneralError,
   });
 
+  const hostMutation = useMutation({
+    mutationFn: hostQuiz,
+    onSuccess: (resData) => {
+      handleGeneralSuccess(resData);
+      setOpenMenu(false);
+      navigate(`/host/${resData.data?.gameCode}`);
+    },
+    onError: handleGeneralError,
+  });
+
   const handleEdit = () => {
     setOpenMenu(false);
     navigate(`/edit/${quiz._id}`);
   };
   const handleHost = () => {
     setOpenMenu(false);
-    navigate(`/host/${quiz._id}`);
+    hostMutation.mutate(quiz._id);
   };
   const handleDelete = async () => {
     deleteMutation.mutate(quiz._id);
@@ -118,7 +129,11 @@ function QuizCard({ quiz }: Props) {
             <Button
               variant="ghost"
               className="hover:text-primary flex cursor-default items-center justify-start gap-2 p-1 px-2 text-sm"
-              disabled={deleteMutation.isPending || copyMutation.isPending}
+              disabled={
+                deleteMutation.isPending ||
+                copyMutation.isPending ||
+                hostMutation.isPending
+              }
               onClick={handleEdit}
             >
               <Edit2 size={12} />
@@ -127,7 +142,11 @@ function QuizCard({ quiz }: Props) {
             <Button
               variant="ghost"
               className="hover:text-chart-4 flex cursor-default items-center justify-start gap-2 p-1 px-2 text-sm"
-              disabled={deleteMutation.isPending || copyMutation.isPending}
+              disabled={
+                deleteMutation.isPending ||
+                copyMutation.isPending ||
+                hostMutation.isPending
+              }
               onClick={handleCopy}
             >
               <Copy size={12} />
@@ -136,7 +155,11 @@ function QuizCard({ quiz }: Props) {
             <Button
               variant="ghost"
               className="hover:text-destructive flex cursor-default items-center justify-start gap-2 p-1 px-2 text-sm"
-              disabled={deleteMutation.isPending || copyMutation.isPending}
+              disabled={
+                deleteMutation.isPending ||
+                copyMutation.isPending ||
+                hostMutation.isPending
+              }
               onClick={handleDelete}
             >
               <Trash2 size={12} />

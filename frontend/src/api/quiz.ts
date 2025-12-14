@@ -29,7 +29,7 @@ export const updateQuiz = async (data: {
 }) => {
   const res = await api.put<ApiResponse<QuizBackend>>(
     `/quiz/update/${data.quizId}`,
-    data.data
+    data.data,
   );
   return res.data;
 };
@@ -56,7 +56,7 @@ export const getQuizzes = async ({
   readyOnly = false,
 }: getQuizzesRequest) => {
   const res = await api.get<ApiResponseQuery<QuizListItem>>(
-    `/quiz?page=${page}&pageSize=${pageSize}&draftOnly=${draftOnly}&readyOnly=${readyOnly}`
+    `/quiz?page=${page}&pageSize=${pageSize}&draftOnly=${draftOnly}&readyOnly=${readyOnly}`,
   );
   return res.data;
 };

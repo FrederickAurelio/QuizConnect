@@ -19,8 +19,8 @@ type GameSettingsProps = {
     questionCount: number;
     shuffleQuestions: boolean;
     shuffleAnswers: boolean;
-    questionTime: string;
-    cooldownTime: string;
+    timePerQuestion: string;
+    cooldown: string;
   };
   updateSetting: (
     key:
@@ -28,8 +28,8 @@ type GameSettingsProps = {
       | "questionCount"
       | "shuffleQuestions"
       | "shuffleAnswers"
-      | "questionTime"
-      | "cooldownTime",
+      | "timePerQuestion"
+      | "cooldown",
     value: any,
   ) => void;
 };
@@ -164,8 +164,8 @@ function GameSettings({
               <p className="text-xs text-white/30">Limit per question</p>
             </div>
             <Select
-              value={settings.questionTime}
-              onValueChange={(val) => updateSetting("questionTime", val)}
+              value={settings.timePerQuestion}
+              onValueChange={(val) => updateSetting("timePerQuestion", val)}
             >
               <SelectTrigger className="text-secondary-foreground w-[130px] font-semibold">
                 <SelectValue />
@@ -185,8 +185,8 @@ function GameSettings({
               <p className="text-xs text-white/30">Pause between rounds</p>
             </div>
             <Select
-              value={settings.cooldownTime}
-              onValueChange={(val) => updateSetting("cooldownTime", val)}
+              value={settings.cooldown}
+              onValueChange={(val) => updateSetting("cooldown", val)}
             >
               <SelectTrigger className="text-secondary-foreground w-[130px] font-semibold">
                 <SelectValue />
@@ -195,6 +195,7 @@ function GameSettings({
                 <SelectItem value="5">5 seconds</SelectItem>
                 <SelectItem value="10">10 seconds</SelectItem>
                 <SelectItem value="15">15 seconds</SelectItem>
+                <SelectItem value="20">20 seconds</SelectItem>
               </SelectContent>
             </Select>
           </div>
