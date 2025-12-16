@@ -52,7 +52,7 @@ function GameSettings({
         <h1 className="text-lg font-medium">Game Settings</h1>
       </div>
 
-      <div className="flex flex-col gap-6 px-2">
+      <div className="scroll-primary flex flex-col gap-6 overflow-y-auto px-2">
         {/* GROUP 1: Capacity & Content */}
         <section className="flex flex-col gap-4">
           <div className="flex items-center justify-between gap-3">
