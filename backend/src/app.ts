@@ -50,13 +50,17 @@ export const sessionMiddleware = session({
   secret: process.env.SESSION_SECRET || "defaultFallbackSecret",
   saveUninitialized: false,
   resave: false,
+  rolling: true, // This is crucial for constantly renewing the client cookie's
   cookie: {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    maxAge: 120000 * 60, // 120mins
+    maxAge: 120000 * 60,
   },
   store: MongoStore.create({
     client: mongoose.connection.getClient(),
+    ttl: 120 * 60, // 7200 seconds (2 hours)
+    touchAfter: 300,
+    // ----------------------------------------
   }),
 });
 app.use(sessionMiddleware);
