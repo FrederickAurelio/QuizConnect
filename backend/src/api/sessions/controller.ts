@@ -5,6 +5,7 @@ import { redis } from "../../redis/index.js";
 import Quiz from "../../models/Quiz.js";
 import { Types } from "mongoose";
 import { handleControllerError } from "../../utils/handle-control-error.js";
+import { LobbyState } from "../../redis/lobby.js";
 
 type PopulatedCreator = {
   _id: Types.ObjectId;
@@ -20,6 +21,7 @@ type QuizWithCreator = {
   creatorId: PopulatedCreator;
 };
 
+const EXPIRY_SECONDS = 7200;
 const hostQuizSchema = z.object({
   quizId: z.string().min(1, "Quiz ID is required"),
 });
@@ -45,22 +47,6 @@ export const hostQuiz = async (req: Request, res: Response) => {
     const activeLobbyKey = `activeHostLobby:${userId}:${quizId}`;
     const existingGameCode = await redis.get(activeLobbyKey);
 
-    if (existingGameCode) {
-      const lobbyExists = await redis.exists(`game:${existingGameCode}`);
-
-      if (lobbyExists) {
-        return res.status(200).json({
-          message: "Lobby already active, returning existing game code.",
-          data: {
-            gameCode: existingGameCode,
-          },
-          errors: null,
-        });
-      } else {
-        await redis.del(activeLobbyKey);
-      }
-    }
-
     let gameCode = "";
     do {
       gameCode = generateGameCode();
@@ -80,6 +66,37 @@ export const hostQuiz = async (req: Request, res: Response) => {
         data: null,
         errors: null,
       });
+    }
+
+    if (existingGameCode) {
+      const lobbyExists = await redis.get(`game:${existingGameCode}`);
+      if (lobbyExists) {
+        const oldLobbyState: LobbyState = JSON.parse(lobbyExists);
+        oldLobbyState.quiz.description = quiz.description;
+        oldLobbyState.quiz.title = quiz.title;
+        if (oldLobbyState.quiz.questionCount !== quiz.questions.length) {
+          oldLobbyState.quiz.questionCount = quiz.questions.length;
+          oldLobbyState.settings.questionCount = quiz.questions.length;
+        }
+
+        await redis.set(
+          `game:${existingGameCode}`,
+          JSON.stringify(oldLobbyState),
+          {
+            EX: EXPIRY_SECONDS,
+          }
+        );
+
+        return res.status(200).json({
+          message: "Lobby already active, returning existing game code.",
+          data: {
+            gameCode: existingGameCode,
+          },
+          errors: null,
+        });
+      } else {
+        await redis.del(activeLobbyKey);
+      }
     }
 
     const lobbyState = {
@@ -108,8 +125,6 @@ export const hostQuiz = async (req: Request, res: Response) => {
       createdAt: Date.now(),
     };
 
-    const EXPIRY_SECONDS = 7200; 
-    
     const transaction = redis
       .multi()
       .set(`game:${gameCode}`, JSON.stringify(lobbyState), {

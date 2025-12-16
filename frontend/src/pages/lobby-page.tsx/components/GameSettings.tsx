@@ -114,7 +114,7 @@ function GameSettings({
                     (totalAvailableQuestions % 5) -
                     i * 5,
                 )
-                  .filter((n) => n > 0)
+                  .filter((n) => n > 0 && n !== totalAvailableQuestions)
                   .map((n) => (
                     <SelectItem key={n} value={String(n)}>
                       {n}
