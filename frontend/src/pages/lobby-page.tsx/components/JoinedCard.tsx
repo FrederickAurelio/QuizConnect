@@ -1,13 +1,14 @@
 import type { UserInfo } from "@/api/sessions";
 import { useLogin } from "@/contexts/login-context";
 import PlayerBubble from "@/pages/lobby-page.tsx/components/PlayerBubble";
-import { Users } from "lucide-react";
+import clsx from "clsx";
+import { Dot, Users } from "lucide-react";
 
 function JoinedCard({
   host,
   players,
 }: {
-  host: UserInfo;
+  host: UserInfo & { online: boolean };
   players: UserInfo[];
 }) {
   const { user } = useLogin();
@@ -20,15 +21,23 @@ function JoinedCard({
           <Users className="translate-y-px" size={20} />
           {players.length} Players Joined
         </h1>
-        <div className="bg-secondary/30 hover:bg-secondary/50 flex h-fit max-w-[240px] items-center gap-2 rounded-xl p-2 pr-3 transition-colors duration-150 ease-in-out">
+        <div className="bg-secondary/30 hover:bg-secondary/50 flex h-fit max-w-[240px] items-center gap-1 rounded-xl p-2 pr-3 transition-colors duration-150 ease-in-out">
           <div className="bg-primary/15 shrink-0 rounded-full p-1.5">
             <img className="size-5" src={host.avatar ?? ""} alt="host-avatar" />
           </div>
-          <p
-            className={`truncate text-base font-medium ${isHost ? "text-primary" : "text-white"}`}
-          >
-            {host.username}
-          </p>
+          <div className="flex shrink-0 items-center">
+            <Dot
+              className={clsx(
+                host.online ? "text-green-400" : "text-red-600",
+                "scale-200", // Back to a highly visible size
+              )}
+            />
+            <p
+              className={`flex items-center truncate text-base font-medium ${isHost ? "text-primary" : "text-white"}`}
+            >
+              {host.username}
+            </p>
+          </div>
         </div>
       </div>
 

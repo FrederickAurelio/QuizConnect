@@ -1,21 +1,18 @@
-import { Server } from "socket.io";
 import type { Server as HttpServer } from "http";
-
-export let io: Server;
+import { Server } from "socket.io";
+import { setupLobbySocket } from "./lobby-socket.js";
 
 export const setupSocket = (httpServer: HttpServer) => {
-  io = new Server(httpServer, {
+  const io = new Server(httpServer, {
     cors: {
-      origin: "*",
+      origin: "http://localhost:3221",
+      credentials: true,
     },
   });
 
   io.on("connection", (socket) => {
     console.log("Socket connected:", socket.id);
-
-    socket.on("disconnect", () => {
-      console.log("Socket disconnected:", socket.id);
-    });
+    setupLobbySocket(io, socket);
   });
 
   return io;

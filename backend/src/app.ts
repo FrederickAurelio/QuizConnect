@@ -8,10 +8,11 @@ import cors from "cors";
 import dotenv from "dotenv";
 import authRoute from "./api/auth/router.js";
 import quizRouter from "./api/quiz/router.js";
-import { connectRedis, redis } from "./utils/redis.js";
-import { setupSocket } from "./utils/socket.js";
+import { connectRedis } from "./redis/index.js";
 import http from "http";
 import sessionRouter from "./api/sessions/router.js";
+import { setupSocket } from "./sockets/index.js";
+import { setupLobbySocket } from "./sockets/lobby-socket.js";
 
 dotenv.config();
 
@@ -24,9 +25,11 @@ mongoose
 const PORT = process.env.PORT || 2000;
 const app = express();
 
+const server = http.createServer(app);
+
 app.use(
   cors({
-    origin: "http://localhost:5173",
+    origin: "http://localhost:3221",
     methods: ["GET", "POST", "DELETE", "PUT"],
     allowedHeaders: [
       "Content-Type",
@@ -43,28 +46,47 @@ app.use(express.json());
 app.use(cookieParser(process.env.COOKIE_SECRET));
 
 // Session setup with secure settings
-app.use(
-  session({
-    secret: process.env.SESSION_SECRET || "defaultFallbackSecret",
-    saveUninitialized: false,
-    resave: false,
-    cookie: {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      maxAge: 120000 * 60, // 120mins
-    },
-    store: MongoStore.create({
-      client: mongoose.connection.getClient(),
-    }),
-  })
-);
-
-const server = http.createServer(app);
+export const sessionMiddleware = session({
+  secret: process.env.SESSION_SECRET || "defaultFallbackSecret",
+  saveUninitialized: false,
+  resave: false,
+  cookie: {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    maxAge: 120000 * 60, // 120mins
+  },
+  store: MongoStore.create({
+    client: mongoose.connection.getClient(),
+  }),
+});
+app.use(sessionMiddleware);
 
 // Redis
 connectRedis();
 // WebSocket
-setupSocket(server);
+const io = setupSocket(server);
+
+// now you can use io.use
+const wrap = (middleware: any) => (socket: any, next: any) =>
+  middleware(socket.request, {} as any, next);
+
+io.use(wrap(sessionMiddleware));
+
+io.use((socket, next) => {
+  const req = socket.request as any;
+
+  if (!req.session?.userId) {
+    return next(new Error("Unauthorized"));
+  }
+
+  socket.data.user = {
+    _id: req.session.userId,
+    username: req.session.username,
+    avatar: req.session.avatar,
+  };
+
+  next();
+});
 
 app.use("/auth", authRoute);
 app.use("/quiz", quizRouter);
@@ -82,4 +104,4 @@ app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
   res.status(500).send({ error: "Something went wrong" });
 });
 
-export { app, PORT };
+export { app, PORT, server };

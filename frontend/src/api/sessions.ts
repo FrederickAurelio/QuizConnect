@@ -1,4 +1,4 @@
-import type { ApiRequestQuery, ApiResponse, ApiResponseQuery } from "@/api";
+import type { ApiResponse } from "@/api";
 import { api } from "@/lib/axios";
 
 export type UserInfo = {
@@ -25,7 +25,7 @@ export type GameSettings = {
 
 export type LobbyState = {
   gameCode: string;
-  host: UserInfo;
+  host: UserInfo & { online: boolean };
   quiz: QuizInfo;
   settings: GameSettings;
   players: UserInfo[];

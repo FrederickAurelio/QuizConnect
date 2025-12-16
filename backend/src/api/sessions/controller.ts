@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import z from "zod";
 import { generateGameCode } from "../../utils/tools.js";
-import { redis } from "../../utils/redis.js";
+import { redis } from "../../redis/index.js";
 import Quiz from "../../models/Quiz.js";
 import { Types } from "mongoose";
 import { handleControllerError } from "../../utils/handle-control-error.js";
@@ -40,6 +40,25 @@ export const hostQuiz = async (req: Request, res: Response) => {
         data: null,
         errors: null,
       });
+    }
+
+    const activeLobbyKey = `activeHostLobby:${userId}:${quizId}`;
+    const existingGameCode = await redis.get(activeLobbyKey);
+
+    if (existingGameCode) {
+      const lobbyExists = await redis.exists(`game:${existingGameCode}`);
+
+      if (lobbyExists) {
+        return res.status(200).json({
+          message: "Lobby already active, returning existing game code.",
+          data: {
+            gameCode: existingGameCode,
+          },
+          errors: null,
+        });
+      } else {
+        await redis.del(activeLobbyKey);
+      }
     }
 
     let gameCode = "";
@@ -89,9 +108,16 @@ export const hostQuiz = async (req: Request, res: Response) => {
       createdAt: Date.now(),
     };
 
-    await redis.set(`game:${gameCode}`, JSON.stringify(lobbyState), {
-      EX: 7200,
-    });
+    const EXPIRY_SECONDS = 7200; 
+    
+    const transaction = redis
+      .multi()
+      .set(`game:${gameCode}`, JSON.stringify(lobbyState), {
+        EX: EXPIRY_SECONDS,
+      })
+      .set(activeLobbyKey, gameCode, { EX: EXPIRY_SECONDS });
+
+    await transaction.exec();
 
     return res.status(200).json({
       message: "Created Lobby successfully",

@@ -1,3 +1,5 @@
-import { app, PORT } from "./app.js";
+import { server, PORT } from "./app.js";
 
-app.listen(PORT, () => console.log(`Server is now running on port ${PORT}`));
+server.listen(PORT, () => {
+  console.log(`Server running on http://localhost:${PORT}`);
+});

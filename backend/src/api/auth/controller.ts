@@ -75,6 +75,8 @@ export const registerUser = async (req: Request, res: Response) => {
 
     req.session.userId = newUser._id;
     req.session.type = "auth";
+    req.session.username = username;
+    req.session.avatar = randomAvatarSrc;
 
     return res.status(201).json({
       message: "User registered successfully",
@@ -116,6 +118,8 @@ export const loginUser = async (req: Request, res: Response) => {
 
     req.session.userId = existingUser._id;
     req.session.type = "auth";
+    req.session.username = existingUser.username;
+    req.session.avatar = existingUser.avatar;
 
     return res.status(200).json({
       message: "Login successful",
@@ -199,6 +203,8 @@ export const resetPasswordUser = async (req: Request, res: Response) => {
 
     req.session.userId = user._id;
     req.session.type = "auth";
+    req.session.username = user.username;
+    req.session.avatar = user.avatar;
 
     return res.status(201).json({
       message: "Password reset successfully",
