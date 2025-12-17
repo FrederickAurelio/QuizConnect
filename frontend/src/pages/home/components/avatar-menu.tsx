@@ -5,6 +5,7 @@ import {
   PopoverAnchor,
   PopoverContent,
 } from "@/components/ui/popover";
+import { useEditProfile } from "@/contexts/edit-profile-context";
 import { useLogin } from "@/contexts/login-context";
 import { handleGeneralError, handleGeneralSuccess } from "@/lib/axios";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -15,6 +16,7 @@ import { useNavigate } from "react-router";
 function AvatarMenu() {
   const navigate = useNavigate();
   const { user, clearUser } = useLogin();
+  const { openProfileEdit } = useEditProfile();
   const [openMenu, setOpenMenu] = useState(false);
   const queryClient = useQueryClient();
 
@@ -36,8 +38,7 @@ function AvatarMenu() {
 
     switch (option) {
       case "edit":
-        // open modal
-        console.log("Edit Profile clicked");
+        openProfileEdit();
         break;
 
       case "history":

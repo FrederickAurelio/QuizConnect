@@ -58,3 +58,12 @@ export const sendCode = async (data: sendCodeRequest) => {
   const res = await api.post<ApiResponse<null>>("/auth/code", data);
   return res.data;
 };
+
+type EditProfileRequest = {
+  username: string;
+  avatar: string;
+};
+export const editProfile = async (data: EditProfileRequest) => {
+  const res = await api.post<ProfileUserResponse>("/auth/edit-profile", data);
+  return res.data;
+};

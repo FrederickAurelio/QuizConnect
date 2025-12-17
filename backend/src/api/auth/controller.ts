@@ -31,6 +31,11 @@ const resetPasswordSchema = z.object({
   verificationCode: z.string().min(6),
 });
 
+const editProfileSchema = z.object({
+  username: z.string().min(3).max(50),
+  avatar: z.string(),
+});
+
 // ---------------- REGISTER ----------------
 export const registerUser = async (req: Request, res: Response) => {
   try {
@@ -208,6 +213,52 @@ export const resetPasswordUser = async (req: Request, res: Response) => {
 
     return res.status(201).json({
       message: "Password reset successfully",
+      data: {
+        userId: user._id,
+        username: user.username,
+        avatar: user.avatar || "",
+      },
+      errors: null,
+    });
+  } catch (error) {
+    return handleControllerError(res, error);
+  }
+};
+
+// ---------------- CHANGE PROFILE ----------------
+export const editProfileUser = async (req: Request, res: Response) => {
+  try {
+    const parsedData = editProfileSchema.parse(req.body);
+    const { username, avatar } = parsedData;
+
+    const userId = req.session.userId;
+    if (!userId) {
+      return res.status(401).json({
+        message: "Unauthorized!",
+        data: null,
+        errors: null,
+      });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(400).json({
+        message: "We couldn't found the user",
+        data: null,
+        errors: null,
+      });
+    }
+
+    user.avatar = avatar;
+    user.username = username;
+
+    await user.save();
+
+    req.session.username = user.username;
+    req.session.avatar = user.avatar;
+
+    return res.status(201).json({
+      message: "Profile updated successfully",
       data: {
         userId: user._id,
         username: user.username,

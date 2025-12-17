@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import "./index.css";
 import EditPage from "@/pages/edit-page";
 import LobbyPageRoute from "@/pages/lobby-page.tsx/lobby-page-route";
+import EditProfileProvider from "@/contexts/edit-profile-context";
 
 // -------------------- Private Route --------------------
 function PrivateRoute({ children }: { children: React.ReactNode }) {
@@ -96,7 +97,9 @@ createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
       <LoginProvider>
-        <AppRouter />
+        <EditProfileProvider>
+          <AppRouter />
+        </EditProfileProvider>
       </LoginProvider>
     </QueryClientProvider>
     <Toaster position="top-center" />
