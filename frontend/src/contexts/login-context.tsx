@@ -41,7 +41,12 @@ function LoginProvider({ children }: { children: ReactNode }) {
     setUser(null);
   };
 
-  const { isPending } = useQuery({
+  const {
+    isPending: isPendings,
+    isLoading,
+    isFetched,
+    isFetching,
+  } = useQuery({
     queryKey: ["currentUser"],
     queryFn: async () => {
       const { data } = await initialGetUser();
@@ -59,6 +64,8 @@ function LoginProvider({ children }: { children: ReactNode }) {
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
   });
+
+  const isPending = isPendings || isLoading || !isFetched || isFetching;
 
   return (
     <LoginContext

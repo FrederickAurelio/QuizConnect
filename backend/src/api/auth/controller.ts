@@ -240,29 +240,31 @@ export const editProfileUser = async (req: Request, res: Response) => {
       });
     }
 
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({
-        message: "We couldn't found the user",
-        data: null,
-        errors: null,
-      });
+    if (req.session.type === "auth") {
+      const user = await User.findById(userId);
+      if (!user) {
+        return res.status(404).json({
+          message: "We couldn't found the user",
+          data: null,
+          errors: null,
+        });
+      }
+
+      user.avatar = avatar;
+      user.username = username;
+
+      await user.save();
     }
 
-    user.avatar = avatar;
-    user.username = username;
-
-    await user.save();
-
-    req.session.username = user.username;
-    req.session.avatar = user.avatar;
+    req.session.username = username;
+    req.session.avatar = avatar;
 
     return res.status(201).json({
       message: "Profile updated successfully",
       data: {
-        userId: user._id,
-        username: user.username,
-        avatar: user.avatar || "",
+        userId: userId,
+        username: username,
+        avatar: avatar,
       },
       errors: null,
     });

@@ -4,19 +4,14 @@ import type {
 } from "@/api/sessions";
 import { useLogin } from "@/contexts/login-context";
 import { socket } from "@/lib/socket";
+import { useRef, useState } from "react";
 import GameSettings from "./components/GameSettings";
 import JoinedCard from "./components/JoinedCard";
 import LobbyPageHeader from "./components/LobbyPageHeader";
-import { useEffect, useRef, useState } from "react";
-import { toast } from "sonner";
-import { useNavigate } from "react-router";
 
 function LobbyPage({ lobby }: { lobby: LobbyState }) {
   const { user } = useLogin();
-  const navigate = useNavigate();
   const emitTimeout = useRef<any>(null);
-
-  const [lobbyState, setLobbyState] = useState<LobbyState>(lobby);
 
   const {
     gameCode,
@@ -24,37 +19,12 @@ function LobbyPage({ lobby }: { lobby: LobbyState }) {
     quiz: quizMetadata,
     settings: serverSettings,
     players,
-  } = lobbyState;
+  } = lobby;
 
   const isHost = host._id === user?.userId;
   const totalAvailableQuestions = quizMetadata.questionCount;
 
   const [settingsDraft, setSettingsDraft] = useState(serverSettings);
-
-  useEffect(() => {
-    socket.emit("join-game", { gameCode });
-
-    const handleLobbyUpdated = (updatedLobby: LobbyState) => {
-      setLobbyState(updatedLobby);
-
-      if (isHost) {
-        setSettingsDraft(updatedLobby.settings);
-      }
-    };
-
-    const handleKicked = (msg: string) => {
-      toast.error(msg);
-      navigate("/");
-    };
-
-    socket.on("lobby-updated", handleLobbyUpdated);
-    socket.on("kicked", handleKicked);
-
-    return () => {
-      socket.emit("leave-game");
-      socket.off("lobby-updated", handleLobbyUpdated);
-    };
-  }, []);
 
   const updateSetting = (key: keyof typeof settingsDraft, value: any) => {
     if (!isHost) return;

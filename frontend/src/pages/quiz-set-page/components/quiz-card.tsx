@@ -92,7 +92,7 @@ function QuizCard({ quiz }: Props) {
     onSuccess: (resData) => {
       handleGeneralSuccess(resData);
       setOpenMenu(false);
-      navigate(`/host/${resData.data?.gameCode}`);
+      navigate(`/game/${resData.data?.gameCode}`);
     },
     onError: handleGeneralError,
   });

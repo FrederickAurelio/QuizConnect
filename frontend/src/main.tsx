@@ -13,7 +13,7 @@ import { RouterProvider } from "react-router/dom";
 import { toast } from "sonner";
 import "./index.css";
 import EditPage from "@/pages/edit-page";
-import LobbyPageRoute from "@/pages/lobby-page.tsx/lobby-page-route";
+import LobbyPageRoute from "@/pages/lobby-page-route";
 import EditProfileProvider from "@/contexts/edit-profile-context";
 
 // -------------------- Private Route --------------------
@@ -74,12 +74,8 @@ function AppRouter() {
           ),
         },
         {
-          path: "/host/:gameCode",
-          element: (
-            <PrivateRoute>
-              <LobbyPageRoute />
-            </PrivateRoute>
-          ),
+          path: "/game/:gameCode",
+          element: <LobbyPageRoute />,
         },
         {
           path: "*",
