@@ -20,15 +20,12 @@ function LobbyPage({ lobby }: { lobby: LobbyState }) {
     settings: serverSettings,
     players,
   } = lobby;
-
   const isHost = host._id === user?.userId;
   const totalAvailableQuestions = quizMetadata.questionCount;
 
   const [settingsDraft, setSettingsDraft] = useState(serverSettings);
-
   const updateSetting = (key: keyof typeof settingsDraft, value: any) => {
     if (!isHost) return;
-
     let newSettings: GameSettingsType;
 
     setSettingsDraft((prev) => {
@@ -39,7 +36,6 @@ function LobbyPage({ lobby }: { lobby: LobbyState }) {
     if (emitTimeout.current) {
       clearTimeout(emitTimeout.current);
     }
-
     emitTimeout.current = setTimeout(() => {
       socket.emit("update-settings", {
         gameCode,
