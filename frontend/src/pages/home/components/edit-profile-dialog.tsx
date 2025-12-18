@@ -16,10 +16,12 @@ import { useEditProfile } from "@/contexts/edit-profile-context";
 import { useLogin } from "@/contexts/login-context";
 import { handleGeneralError } from "@/lib/axios";
 import { avatars } from "@/lib/constant";
+import { socket } from "@/lib/socket";
 import { useMutation } from "@tanstack/react-query";
 import clsx from "clsx";
 import { Pencil, SaveAll } from "lucide-react";
 import { useState } from "react";
+import { useParams } from "react-router";
 import { toast } from "sonner";
 
 type Props = {
@@ -28,6 +30,7 @@ type Props = {
 };
 
 function EditProfileDialog({ open, onOpenChange }: Props) {
+  const { gameCode } = useParams();
   const { user, setUser } = useLogin();
   const { closeProfileEdit } = useEditProfile();
 
@@ -59,6 +62,13 @@ function EditProfileDialog({ open, onOpenChange }: Props) {
         username: user?.username,
       });
     }, 1000);
+
+    if (gameCode) {
+      socket.emit("update-profile", {
+        username: user.username,
+        avatar: user.avatar,
+      });
+    }
   };
 
   const editProfileMutation = useMutation({

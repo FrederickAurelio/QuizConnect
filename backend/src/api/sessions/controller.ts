@@ -74,6 +74,10 @@ export const hostQuiz = async (req: Request, res: Response) => {
         const oldLobbyState: LobbyState = JSON.parse(lobbyExists);
         oldLobbyState.quiz.description = quiz.description;
         oldLobbyState.quiz.title = quiz.title;
+        oldLobbyState.host.username =
+          req.session.username ?? oldLobbyState.host.username;
+        oldLobbyState.host.avatar =
+          req.session.avatar ?? oldLobbyState.host.avatar;
         if (oldLobbyState.quiz.questionCount !== quiz.questions.length) {
           oldLobbyState.quiz.questionCount = quiz.questions.length;
           oldLobbyState.settings.questionCount = quiz.questions.length;
@@ -105,6 +109,7 @@ export const hostQuiz = async (req: Request, res: Response) => {
         _id: userId,
         username: quiz.creatorId.username,
         avatar: quiz.creatorId.avatar,
+        online: true,
       },
       quiz: {
         _id: quizId,

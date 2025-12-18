@@ -1,8 +1,9 @@
 import type { UserInfo } from "@/api/sessions";
+import { useEditProfile } from "@/contexts/edit-profile-context";
 import { useLogin } from "@/contexts/login-context";
 import PlayerBubble from "@/pages/lobby-page.tsx/components/PlayerBubble";
 import clsx from "clsx";
-import { Dot, Users } from "lucide-react";
+import { Dot, Info, Users } from "lucide-react";
 
 function JoinedCard({
   host,
@@ -11,6 +12,7 @@ function JoinedCard({
   host: UserInfo & { online: boolean };
   players: UserInfo[];
 }) {
+  const { openProfileEdit } = useEditProfile();
   const { user } = useLogin();
   const isHost = host._id === user?.userId;
 
@@ -38,6 +40,17 @@ function JoinedCard({
               {host.username}
             </p>
           </div>
+          {isHost && (
+            <button
+              onClick={openProfileEdit}
+              className="ml-1 flex shrink-0 items-center"
+            >
+              <Info
+                className="hover:text-primary text-white/60 transition-colors"
+                size={16}
+              />
+            </button>
+          )}
         </div>
       </div>
 

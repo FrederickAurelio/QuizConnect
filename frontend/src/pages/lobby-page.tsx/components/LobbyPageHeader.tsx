@@ -1,5 +1,6 @@
 import type { QuizInfo } from "@/api/sessions";
 import { ArrowLeft, Copy } from "lucide-react";
+import { useLocation, useNavigate } from "react-router";
 
 function LobbyPageHeader({
   quizMetadata,
@@ -8,9 +9,19 @@ function LobbyPageHeader({
   quizMetadata: QuizInfo;
   gameCode: string;
 }) {
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const handleBack = () => {
+    if (location.key === "default") {
+      navigate("/");
+    } else {
+      navigate(-1);
+    }
+  };
   return (
     <div className="bg-card border-border flex w-full shrink-0 items-center gap-4 rounded-xl border px-4 py-3 text-lg font-semibold">
-      <button className="hover:text-primary mx-2">
+      <button onClick={handleBack} className="hover:text-primary mx-2">
         <ArrowLeft size={20} />
       </button>
       <div className="flex h-16 flex-1 flex-col justify-center">

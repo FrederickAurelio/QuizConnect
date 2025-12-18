@@ -59,3 +59,22 @@ export const removePlayer = async (gameCode: string, playerId: string) => {
   await saveLobby(gameCode, lobby);
   return lobby;
 };
+
+export const updateUserInfo = async (gameCode: string, user: UserInfo) => {
+  const lobby = await getLobby(gameCode);
+  if (!lobby) return null;
+  
+  if (user._id === lobby.host._id) {
+    lobby.host.avatar = user.avatar;
+    lobby.host.username = user.username;
+  } else {
+    lobby.players = lobby.players.map((player) =>
+      player._id === user._id
+        ? { ...player, username: user.username, avatar: user.avatar }
+        : player
+    );
+  }
+
+  await saveLobby(gameCode, lobby);
+  return lobby;
+};

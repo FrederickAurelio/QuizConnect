@@ -3,6 +3,7 @@ import {
   getLobby,
   removePlayer,
   saveLobby,
+  updateUserInfo,
   UserInfo,
 } from "../redis/lobby.js";
 import type { Server, Socket } from "socket.io";
@@ -10,8 +11,30 @@ import type { Server, Socket } from "socket.io";
 export const setupLobbySocket = (io: Server, socket: Socket) => {
   const user = socket.data.user as UserInfo;
 
+  const handleLeaveLobby = async () => {
+    const gameCode = socket.data.gameCode;
+    if (!gameCode) return;
+
+    let lobby = await getLobby(gameCode);
+    if (!lobby) return;
+
+    if (lobby.host._id === user._id) {
+      lobby.host.online = false;
+      await saveLobby(gameCode, lobby);
+    } else {
+      lobby = await removePlayer(gameCode, user._id);
+    }
+
+    if (lobby) io.to(gameCode).emit("lobby-updated", lobby);
+  };
+
   // Join a game/lobby
   socket.on("join-game", async ({ gameCode }: { gameCode: string }) => {
+    const currentLobby = socket.data.gameCode;
+    if (currentLobby && currentLobby !== gameCode) {
+      socket.leave(currentLobby);
+    }
+
     let lobby = await getLobby(gameCode);
     if (!lobby) return socket.emit("error", { message: "Lobby not found" });
 
@@ -45,41 +68,25 @@ export const setupLobbySocket = (io: Server, socket: Socket) => {
     io.to(gameCode).emit("lobby-updated", lobby);
   });
 
-  // Leave game manually
-  socket.on("leave-game", async () => {
-    const gameCode = socket.data.gameCode;
-    if (!gameCode) return;
+  // Update Profile
+  socket.on(
+    "update-profile",
+    async (newProfile: { username: string; avatar: string }) => {
+      const gameCode = socket.data.gameCode;
+      if (!gameCode) return socket.emit("error", { message: "Not in a lobby" });
 
-    let lobby = await getLobby(gameCode);
-    if (!lobby) return;
+      const lobby = await updateUserInfo(gameCode, {
+        ...newProfile,
+        _id: user._id,
+      });
+      if (!lobby) return socket.emit("error", { message: "Lobby not found" });
 
-    if (lobby.host._id === user._id) {
-      lobby.host.online = false;
-      await saveLobby(gameCode, lobby);
-    } else {
-      lobby = await removePlayer(gameCode, user._id);
+      io.to(gameCode).emit("lobby-updated", lobby);
     }
+  );
 
-    if (lobby) io.to(gameCode).emit("lobby-updated", lobby);
-  });
-
-  // Handle disconnect
-  socket.on("disconnect", async () => {
-    const gameCode = socket.data.gameCode;
-    if (!gameCode) return;
-
-    let lobby = await getLobby(gameCode);
-    if (!lobby) return;
-
-    if (lobby.host._id === user._id) {
-      lobby.host.online = false;
-      await saveLobby(gameCode, lobby);
-    } else {
-      lobby = await removePlayer(gameCode, user._id);
-    }
-
-    if (lobby) io.to(gameCode).emit("lobby-updated", lobby);
-  });
+  socket.on("leave-game", handleLeaveLobby);
+  socket.on("disconnect", handleLeaveLobby);
 
   // Start game (host only)
   socket.on("start-game", async () => {

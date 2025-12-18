@@ -1,3 +1,4 @@
+import { useEditProfile } from "@/contexts/edit-profile-context";
 import { CircleX, Info } from "lucide-react";
 
 type Props = {
@@ -8,11 +9,12 @@ type Props = {
 };
 
 function PlayerBubble({ isHost, isUser, name, avatarUrl }: Props) {
+  const { openProfileEdit } = useEditProfile();
   const handleClickAction = () => {
     if (isHost) {
       console.log(`Host wants to remove ${name}`);
     } else if (isUser) {
-      console.log(`User wants to see their info`);
+      openProfileEdit();
     }
   };
 
