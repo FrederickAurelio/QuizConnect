@@ -29,6 +29,10 @@ export type LobbyState = {
   quiz: QuizInfo;
   settings: GameSettings;
   players: UserInfo[];
+  banned: {
+    userId: string;
+    bannedAt: string;
+  };
   status: "lobby" | "started" | "ended";
   createdAt: number;
 };

@@ -85,6 +85,24 @@ export const setupLobbySocket = (io: Server, socket: Socket) => {
     }
   );
 
+  // Kick Player
+  socket.on("kick-player", async (userId: string) => {
+    const gameCode = socket.data.gameCode;
+    if (!gameCode) return socket.emit("error", { message: "Not in a lobby" });
+
+    let lobby = await getLobby(gameCode);
+    if (!lobby) return socket.emit("error", { message: "Lobby not found" });
+    if (lobby.host._id !== user._id)
+      return socket.emit("error", {
+        message: "Only host can update settings",
+      });
+
+    lobby = await removePlayer(gameCode, userId, true);
+
+    io.to(`user:${userId}`).emit("kicked", "You were kicked from the lobby");
+    io.to(gameCode).emit("lobby-updated", lobby);
+  });
+
   socket.on("leave-game", handleLeaveLobby);
   socket.on("disconnect", handleLeaveLobby);
 

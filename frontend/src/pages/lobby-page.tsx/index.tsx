@@ -8,9 +8,12 @@ import GameSettings from "./components/GameSettings";
 import JoinedCard from "./components/JoinedCard";
 import LobbyPageHeader from "./components/LobbyPageHeader";
 import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
+import { useNavigate } from "react-router";
 
 function LobbyPage({ lobby }: { lobby: LobbyState }) {
   const { user } = useLogin();
+  const navigate = useNavigate();
   const emitTimeout = useRef<any>(null);
 
   const [lobbyState, setLobbyState] = useState<LobbyState>(lobby);
@@ -39,7 +42,13 @@ function LobbyPage({ lobby }: { lobby: LobbyState }) {
       }
     };
 
+    const handleKicked = (msg: string) => {
+      toast.error(msg);
+      navigate("/");
+    };
+
     socket.on("lobby-updated", handleLobbyUpdated);
+    socket.on("kicked", handleKicked);
 
     return () => {
       socket.emit("leave-game");

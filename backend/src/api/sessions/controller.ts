@@ -36,7 +36,7 @@ export const hostQuiz = async (req: Request, res: Response) => {
     }
     const { quizId } = hostQuizSchema.parse(req.body);
     if (!quizId) {
-      return res.status(400).json({
+      return res.status(404).json({
         message: "Quiz not found",
         data: null,
         errors: null,
@@ -125,6 +125,7 @@ export const hostQuiz = async (req: Request, res: Response) => {
         cooldown: "5",
       },
       players: [],
+      banned: [],
       status: "lobby",
       createdAt: Date.now(),
     };
@@ -154,7 +155,7 @@ export const getLobby = async (req: Request, res: Response) => {
   try {
     const { gameCode } = req.params;
     if (!gameCode) {
-      return res.status(400).json({
+      return res.status(404).json({
         message: "Game code is required",
         data: null,
         errors: null,
@@ -171,7 +172,29 @@ export const getLobby = async (req: Request, res: Response) => {
       });
     }
 
-    const lobby = JSON.parse(lobbyStr);
+    const lobby: LobbyState = JSON.parse(lobbyStr);
+
+    const BAN_DURATION_MS = 5 * 60 * 1000;
+    const banRecord = (lobby.banned ?? []).find(
+      (p) => p.userId === req.session.userId
+    );
+
+    if (banRecord) {
+      const bannedAtTime = new Date(banRecord.bannedAt).getTime();
+      const currentTime = Date.now();
+      const timeElapsed = currentTime - bannedAtTime;
+
+      // 2. Check if the elapsed time is LESS than 5 minutes
+      if (timeElapsed < BAN_DURATION_MS) {
+        const minutesLeft = Math.ceil((BAN_DURATION_MS - timeElapsed) / 60000);
+
+        return res.status(403).json({
+          message: `You are temporarily banned. Please try again in ${minutesLeft} min.`,
+          data: null,
+          errors: null,
+        });
+      }
+    }
 
     return res.status(200).json({
       message: "Lobby fetched successfully",

@@ -44,7 +44,7 @@ export const registerUser = async (req: Request, res: Response) => {
 
     const existingUser = await User.findOne({ email });
     if (existingUser) {
-      return res.status(400).json({
+      return res.status(403).json({
         message: "Email already in use",
         data: null,
         errors: null,
@@ -57,7 +57,7 @@ export const registerUser = async (req: Request, res: Response) => {
       dbVerificationCode.verificationCode !== verificationCode ||
       dbVerificationCode.verificationCodeExpires < new Date()
     ) {
-      return res.status(400).json({
+      return res.status(401).json({
         message: "Verification code is incorrect or has expired.",
         data: null,
         errors: null,
@@ -105,7 +105,7 @@ export const loginUser = async (req: Request, res: Response) => {
 
     const existingUser = await User.findOne({ email });
     if (!existingUser) {
-      return res.status(400).json({
+      return res.status(403).json({
         message: "Invalid email or password",
         data: null,
         errors: null,
@@ -114,7 +114,7 @@ export const loginUser = async (req: Request, res: Response) => {
 
     const passwordMatch = await bcrypt.compare(password, existingUser.password);
     if (!passwordMatch) {
-      return res.status(400).json({
+      return res.status(403).json({
         message: "Invalid email or password",
         data: null,
         errors: null,
@@ -143,7 +143,7 @@ export const loginUser = async (req: Request, res: Response) => {
 // ---------------- LOGOUT ----------------
 export const logoutUser = (req: Request, res: Response) => {
   if (!req.session) {
-    return res.status(400).json({
+    return res.status(404).json({
       message: "No active session found",
       data: null,
       errors: null,
@@ -178,7 +178,7 @@ export const resetPasswordUser = async (req: Request, res: Response) => {
 
     const user = await User.findOne({ email });
     if (!user) {
-      return res.status(400).json({
+      return res.status(404).json({
         message: "We couldn't found the user with this email",
         data: null,
         errors: null,
@@ -191,7 +191,7 @@ export const resetPasswordUser = async (req: Request, res: Response) => {
       dbVerificationCode.verificationCode !== verificationCode ||
       dbVerificationCode.verificationCodeExpires < new Date()
     ) {
-      return res.status(400).json({
+      return res.status(401).json({
         message: "Verification code is incorrect or has expired.",
         data: null,
         errors: null,
@@ -242,7 +242,7 @@ export const editProfileUser = async (req: Request, res: Response) => {
 
     const user = await User.findById(userId);
     if (!user) {
-      return res.status(400).json({
+      return res.status(404).json({
         message: "We couldn't found the user",
         data: null,
         errors: null,
@@ -381,7 +381,7 @@ export const sendCode = async (req: Request, res: Response) => {
 
       if (now < cooldownEnd) {
         const secondsLeft = differenceInSeconds(cooldownEnd, now);
-        return res.status(429).json({
+        return res.status(403).json({
           message: `Please wait ${secondsLeft}s before requesting a new code.`,
           data: null,
           errors: null,

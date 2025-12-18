@@ -57,6 +57,8 @@ function JoinedCard({
       <div className="scroll-primary flex w-full flex-1 flex-wrap gap-2 overflow-y-auto">
         {players.map((player) => (
           <PlayerBubble
+            key={player._id}
+            playerId={player._id}
             isUser={player._id === user?.userId}
             avatarUrl={player.avatar}
             name={player.username}

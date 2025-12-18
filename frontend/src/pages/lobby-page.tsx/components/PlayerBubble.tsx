@@ -1,4 +1,5 @@
 import { useEditProfile } from "@/contexts/edit-profile-context";
+import { socket } from "@/lib/socket";
 import { CircleX, Info } from "lucide-react";
 
 type Props = {
@@ -6,13 +7,14 @@ type Props = {
   isUser: boolean;
   name: string;
   avatarUrl: string;
+  playerId: string;
 };
 
-function PlayerBubble({ isHost, isUser, name, avatarUrl }: Props) {
+function PlayerBubble({ isHost, isUser, name, avatarUrl, playerId }: Props) {
   const { openProfileEdit } = useEditProfile();
   const handleClickAction = () => {
     if (isHost) {
-      console.log(`Host wants to remove ${name}`);
+      socket.emit("kick-player", playerId);
     } else if (isUser) {
       openProfileEdit();
     }

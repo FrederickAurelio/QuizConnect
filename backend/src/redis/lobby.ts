@@ -28,6 +28,10 @@ export type LobbyState = {
   quiz: QuizInfo;
   settings: GameSettings;
   players: UserInfo[];
+  banned: {
+    userId: string;
+    bannedAt: string;
+  }[];
   status: "lobby" | "started" | "ended";
   createdAt: number;
 };
@@ -60,10 +64,20 @@ export const addPlayer = async (gameCode: string, player: UserInfo) => {
   return lobby;
 };
 
-export const removePlayer = async (gameCode: string, playerId: string) => {
+export const removePlayer = async (
+  gameCode: string,
+  playerId: string,
+  banned?: boolean
+) => {
   const lobby = await getLobby(gameCode);
   if (!lobby) return null;
   lobby.players = lobby.players.filter((p) => p._id !== playerId);
+  if (banned) {
+    lobby.banned = [
+      ...(lobby.banned ?? []).filter((p) => p.userId !== playerId),
+      { userId: playerId, bannedAt: new Date().toISOString() },
+    ];
+  }
   await saveLobby(gameCode, lobby);
   return lobby;
 };

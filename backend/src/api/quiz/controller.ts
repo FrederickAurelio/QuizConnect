@@ -255,7 +255,7 @@ export const getDetailQuiz = async (req: Request, res: Response) => {
 
     const quizId = req.params.id;
     if (!quizId) {
-      return res.status(400).json({
+      return res.status(404).json({
         message: "Quiz not found",
         data: null,
         errors: null,
