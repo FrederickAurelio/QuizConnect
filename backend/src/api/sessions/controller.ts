@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import z from "zod";
 import { generateGameCode } from "../../utils/tools.js";
-import { redis } from "../../redis/index.js";
+import { EXPIRY_SECONDS, redis } from "../../redis/index.js";
 import Quiz from "../../models/Quiz.js";
 import { Types } from "mongoose";
 import { handleControllerError } from "../../utils/handle-control-error.js";
@@ -21,7 +21,6 @@ type QuizWithCreator = {
   creatorId: PopulatedCreator;
 };
 
-const EXPIRY_SECONDS = 7200;
 const hostQuizSchema = z.object({
   quizId: z.string().min(1, "Quiz ID is required"),
 });

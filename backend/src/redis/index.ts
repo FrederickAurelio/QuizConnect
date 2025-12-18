@@ -1,6 +1,7 @@
 import { createClient } from "redis";
 import "dotenv/config";
 
+export const EXPIRY_SECONDS = 7200;
 export const redis = createClient({
   url: process.env.REDIS_URL || "redis://localhost:6379",
 });

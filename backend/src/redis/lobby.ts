@@ -1,4 +1,4 @@
-import { redis } from "./index.js";
+import { EXPIRY_SECONDS, redis } from "./index.js";
 
 export type UserInfo = {
   _id: string;
@@ -40,7 +40,15 @@ export const getLobby = async (
 };
 
 export const saveLobby = async (gameCode: string, lobby: LobbyState) => {
-  await redis.set(`game:${gameCode}`, JSON.stringify(lobby), { EX: 7200 });
+  const activeLobbyKey = `activeHostLobby:${lobby.host._id}:${lobby.quiz._id}`;
+  const transaction = redis
+    .multi()
+    .set(`game:${gameCode}`, JSON.stringify(lobby), {
+      EX: EXPIRY_SECONDS,
+    })
+    .set(activeLobbyKey, gameCode, { EX: EXPIRY_SECONDS });
+
+  await transaction.exec();
 };
 
 export const addPlayer = async (gameCode: string, player: UserInfo) => {
@@ -63,7 +71,7 @@ export const removePlayer = async (gameCode: string, playerId: string) => {
 export const updateUserInfo = async (gameCode: string, user: UserInfo) => {
   const lobby = await getLobby(gameCode);
   if (!lobby) return null;
-  
+
   if (user._id === lobby.host._id) {
     lobby.host.avatar = user.avatar;
     lobby.host.username = user.username;
