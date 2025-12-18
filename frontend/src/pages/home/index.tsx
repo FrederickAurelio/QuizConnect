@@ -1,7 +1,10 @@
 "use client";
+import { checkLobbyStatus } from "@/api/sessions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useLogin } from "@/contexts/login-context";
+import { handleGeneralError } from "@/lib/axios";
+import { useMutation } from "@tanstack/react-query";
 import { Gamepad, Globe, JoystickIcon, Plus } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { useNavigate } from "react-router";
@@ -27,8 +30,17 @@ function LandingPage() {
   const { isAuthenticated, openLogin } = useLogin();
   const [codeInput, setCodeInput] = useState("");
 
+  const joinMutation = useMutation({
+    mutationFn: checkLobbyStatus,
+    onSuccess: (data) => {
+      navigate(`/game/${data.data?.gameCode}`);
+    },
+    onError: handleGeneralError,
+  });
+
   const handleClickJoin = () => {
     if (codeInput.length < 6) return;
+    joinMutation.mutate(codeInput);
   };
   const handleClickHost = () => {
     if (!isAuthenticated) {
@@ -69,6 +81,7 @@ function LandingPage() {
             value={codeInput}
           />
           <Button
+            disabled={codeInput.length < 6 || joinMutation.isPending}
             size="lg"
             className="flex w-full items-center gap-1 rounded-xl text-lg font-bold"
             onClick={handleClickJoin}

@@ -51,3 +51,10 @@ export const getLobby = async (gameCode: string) => {
   const res = await api.get<ApiResponse<LobbyState>>(`/sessions/${gameCode}`);
   return res.data;
 };
+
+export const checkLobbyStatus = async (gameCode: string) => {
+  const res = await api.post<ApiResponse<{ gameCode: string }>>(
+    `/sessions/check/${gameCode}`,
+  );
+  return res.data;
+};

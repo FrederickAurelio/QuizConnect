@@ -151,54 +151,117 @@ export const hostQuiz = async (req: Request, res: Response) => {
   }
 };
 
+/**
+ * Shared helper to validate lobby existence, bans, and capacity.
+ * Returns { lobby } on success, or { errorResponse } if a check fails.
+ */
+const validateLobbyAccess = async (
+  gameCode: string,
+  userId?: string | Types.ObjectId | undefined
+) => {
+  // 1️⃣ Fetch lobby from Redis
+  const lobbyStr = await redis.get(`game:${gameCode}`);
+  if (!lobbyStr) {
+    return {
+      errorResponse: { status: 404, message: "Lobby not found or expired" },
+    };
+  }
+
+  const lobby: LobbyState = JSON.parse(lobbyStr);
+
+  // 2️⃣ Check Ban Status
+  const BAN_DURATION_MS = 5 * 60 * 1000;
+  const banRecord = (lobby.banned ?? []).find((p) => p.userId === userId);
+
+  if (banRecord) {
+    const bannedAtTime = new Date(banRecord.bannedAt).getTime();
+    const currentTime = Date.now();
+    const timeElapsed = currentTime - bannedAtTime;
+
+    if (timeElapsed < BAN_DURATION_MS) {
+      const minutesLeft = Math.ceil((BAN_DURATION_MS - timeElapsed) / 60000);
+      return {
+        errorResponse: {
+          status: 403,
+          message: `You are temporarily banned. Please try again in ${minutesLeft} min.`,
+        },
+      };
+    }
+  }
+
+  // 3️⃣ Check Capacity
+  if (
+    lobby.players.length >= lobby.settings.maxPlayers &&
+    !lobby.players.find((p) => p._id === userId) &&
+    lobby.host._id !== userId
+  ) {
+    return {
+      errorResponse: { status: 403, message: "Lobby is full" },
+    };
+  }
+
+  return { lobby };
+};
+
 export const getLobby = async (req: Request, res: Response) => {
   try {
     const { gameCode } = req.params;
     if (!gameCode) {
-      return res.status(404).json({
-        message: "Game code is required",
-        data: null,
-        errors: null,
-      });
+      return res
+        .status(404)
+        .json({ message: "Game code is required", data: null, errors: null });
     }
 
-    // 1️⃣ Fetch lobby from Redis
-    const lobbyStr = await redis.get(`game:${gameCode}`);
-    if (!lobbyStr) {
-      return res.status(404).json({
-        message: "Lobby not found or expired",
-        data: null,
-        errors: null,
-      });
-    }
-
-    const lobby: LobbyState = JSON.parse(lobbyStr);
-
-    const BAN_DURATION_MS = 5 * 60 * 1000;
-    const banRecord = (lobby.banned ?? []).find(
-      (p) => p.userId === req.session.userId
+    const { lobby, errorResponse } = await validateLobbyAccess(
+      gameCode,
+      req.session.userId
     );
 
-    if (banRecord) {
-      const bannedAtTime = new Date(banRecord.bannedAt).getTime();
-      const currentTime = Date.now();
-      const timeElapsed = currentTime - bannedAtTime;
-
-      // 2. Check if the elapsed time is LESS than 5 minutes
-      if (timeElapsed < BAN_DURATION_MS) {
-        const minutesLeft = Math.ceil((BAN_DURATION_MS - timeElapsed) / 60000);
-
-        return res.status(403).json({
-          message: `You are temporarily banned. Please try again in ${minutesLeft} min.`,
-          data: null,
-          errors: null,
-        });
-      }
+    if (errorResponse) {
+      return res.status(errorResponse.status).json({
+        message: errorResponse.message,
+        data: null,
+        errors: null,
+      });
     }
 
     return res.status(200).json({
       message: "Lobby fetched successfully",
       data: lobby,
+      errors: null,
+    });
+  } catch (error) {
+    return handleControllerError(res, error);
+  }
+};
+
+export const checkLobbyStatus = async (req: Request, res: Response) => {
+  try {
+    const { gameCode } = req.params;
+    if (!gameCode) {
+      return res
+        .status(404)
+        .json({ message: "Game code is required", data: null, errors: null });
+    }
+
+    const { errorResponse } = await validateLobbyAccess(
+      gameCode,
+      req.session.userId
+    );
+
+    if (errorResponse) {
+      return res.status(errorResponse.status).json({
+        message: errorResponse.message,
+        data: null,
+        errors: null,
+      });
+    }
+
+    return res.status(200).json({
+      message: "Lobby is exist",
+      data: {
+        gameCode,
+      },
       errors: null,
     });
   } catch (error) {
