@@ -1,6 +1,8 @@
 import type { QuizInfo } from "@/api/sessions";
-import { ArrowLeft, Copy } from "lucide-react";
+import { ArrowLeft, Check, CheckCircle, Copy } from "lucide-react";
+import { useState } from "react";
 import { useLocation, useNavigate } from "react-router";
+import { toast } from "sonner";
 
 function LobbyPageHeader({
   quizMetadata,
@@ -17,6 +19,20 @@ function LobbyPageHeader({
       navigate("/");
     } else {
       navigate(-1);
+    }
+  };
+
+  const [copied, setCopied] = useState(false);
+  const handleCopyCode = async () => {
+    try {
+      await navigator.clipboard.writeText(gameCode);
+      toast.success("Code copied to clipboard!");
+
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000); // Reset icon after 2 seconds
+    } catch (err) {
+      toast.error("Failed to copy code");
+      console.error("Copy failed:", err);
     }
   };
   return (
@@ -39,9 +55,17 @@ function LobbyPageHeader({
             {gameCode}
           </h2>
         </div>
-        <div className="bg-secondary text-secondary-foreground hover:text-primary flex items-center justify-center rounded-lg p-1.5">
-          <Copy size={14} />
-        </div>
+        <button
+          onClick={handleCopyCode}
+          className="bg-secondary text-secondary-foreground hover:text-primary flex items-center justify-center rounded-lg p-1.5 transition-colors"
+          title="Copy game code"
+        >
+          {copied ? (
+            <CheckCircle size={14} className="text-green-400" />
+          ) : (
+            <Copy size={14} />
+          )}
+        </button>
       </div>
     </div>
   );
