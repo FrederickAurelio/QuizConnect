@@ -34,7 +34,6 @@ function QuizCard({ quiz }: Props) {
     mutationFn: deleteQuiz,
     onSuccess: (resData) => {
       handleGeneralSuccess(resData);
-      setOpenMenu(false);
       queryClient.setQueriesData({ queryKey: ["quizzes"] }, (oldData: any) => {
         if (!oldData) return oldData;
 
@@ -56,7 +55,6 @@ function QuizCard({ quiz }: Props) {
   const copyMutation = useMutation({
     mutationFn: copyQuiz,
     onSuccess: (resData) => {
-      setOpenMenu(false);
       setTimeout(() => {
         handleGeneralSuccess(resData);
         queryClient.setQueriesData(
@@ -91,7 +89,6 @@ function QuizCard({ quiz }: Props) {
     mutationFn: hostQuiz,
     onSuccess: (resData) => {
       handleGeneralSuccess(resData);
-      setOpenMenu(false);
       navigate(`/game/${resData.data?.gameCode}`);
     },
     onError: handleGeneralError,
@@ -106,9 +103,11 @@ function QuizCard({ quiz }: Props) {
     hostMutation.mutate(quiz._id);
   };
   const handleDelete = async () => {
+    setOpenMenu(false);
     deleteMutation.mutate(quiz._id);
   };
   const handleCopy = async () => {
+    setOpenMenu(false);
     copyMutation.mutate(quiz._id);
   };
 

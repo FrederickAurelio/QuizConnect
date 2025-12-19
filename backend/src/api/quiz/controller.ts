@@ -3,6 +3,7 @@ import z from "zod";
 import Quiz from "../../models/Quiz.js";
 import { handleControllerError } from "../../utils/handle-control-error.js";
 import { Types } from "mongoose";
+import { redis } from "../../redis/index.js";
 
 const optionSchema = z.object({
   key: z.enum(["A", "B", "C", "D"]),
@@ -74,6 +75,19 @@ export const updateQuiz = async (req: Request, res: Response) => {
       });
     }
 
+    const activeLobbyKey = `activeHostLobby:${userId}:${id}`;
+    const existingGameCode = await redis.get(activeLobbyKey);
+    if (existingGameCode) {
+      const lobbyExists = await redis.get(`game:${existingGameCode}`);
+      if (lobbyExists) {
+        return res.status(403).json({
+          message: `Cannot modify or delete this quiz because a game is currently running (Code: ${existingGameCode}). Please end the session before making changes.`,
+          data: null,
+          errors: null,
+        });
+      }
+    }
+
     const quiz = await Quiz.findOne({
       _id: new Types.ObjectId(id),
       creatorId: new Types.ObjectId(userId),
@@ -118,6 +132,19 @@ export const deleteQuiz = async (req: Request, res: Response) => {
         data: null,
         errors: null,
       });
+    }
+
+    const activeLobbyKey = `activeHostLobby:${userId}:${id}`;
+    const existingGameCode = await redis.get(activeLobbyKey);
+    if (existingGameCode) {
+      const lobbyExists = await redis.get(`game:${existingGameCode}`);
+      if (lobbyExists) {
+        return res.status(403).json({
+          message: `Cannot modify or delete this quiz because a game is currently running (Code: ${existingGameCode}). Please end the session before making changes.`,
+          data: null,
+          errors: null,
+        });
+      }
     }
 
     const result = await Quiz.deleteOne({ _id: id, creatorId: userId });
