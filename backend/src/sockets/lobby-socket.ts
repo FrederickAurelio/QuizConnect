@@ -1,5 +1,6 @@
 import {
   addPlayer,
+  deleteLobbySession,
   getLobby,
   removePlayer,
   saveLobby,
@@ -84,6 +85,31 @@ export const setupLobbySocket = (io: Server, socket: Socket) => {
       io.to(gameCode).emit("lobby-updated", lobby);
     }
   );
+
+  // Close lobbby
+  socket.on("close-lobby", async () => {
+    const gameCode = socket.data.gameCode;
+    if (!gameCode) return socket.emit("error", { message: "Not in a lobby" });
+
+    let lobby = await getLobby(gameCode);
+    if (!lobby) return socket.emit("error", { message: "Lobby not found" });
+
+    if (lobby.host._id !== user._id) {
+      return socket.emit("error", { message: "Only host can close lobby" });
+    }
+
+    try {
+      io.to(gameCode).emit("kicked", "The host has closed the lobby.");
+
+      setTimeout(async () => {
+        await deleteLobbySession(gameCode, user._id, lobby.quiz._id);
+      }, 400);
+
+      io.in(gameCode).socketsLeave(gameCode);
+    } catch (error) {
+      socket.emit("error", { message: "Failed to close lobby" });
+    }
+  });
 
   // Kick Player
   socket.on("kick-player", async (userId: string) => {

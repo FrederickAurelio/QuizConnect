@@ -1,5 +1,5 @@
 import type { QuizInfo } from "@/api/sessions";
-import { ArrowLeft, Check, CheckCircle, Copy } from "lucide-react";
+import { ArrowLeft, CheckCircle, Copy } from "lucide-react";
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { toast } from "sonner";

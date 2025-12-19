@@ -1,4 +1,12 @@
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -8,8 +16,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { socket } from "@/lib/socket";
+import { DialogClose, DialogDescription } from "@radix-ui/react-dialog";
 import clsx from "clsx";
-import { Minus, Plus, SlidersHorizontal } from "lucide-react";
+import { AlertTriangle, Minus, Plus, SlidersHorizontal } from "lucide-react";
 
 type GameSettingsProps = {
   isHost: boolean;
@@ -40,6 +50,10 @@ function GameSettings({
   settings,
   updateSetting,
 }: GameSettingsProps) {
+  function handleTerminateGame() {
+    socket.emit("close-lobby");
+  }
+
   return (
     <div
       className={clsx(
@@ -47,9 +61,47 @@ function GameSettings({
         !isHost && "pointer-events-none opacity-75",
       )}
     >
-      <div className="text-secondary-foreground/50 flex items-center gap-2">
-        <SlidersHorizontal size={20} />
-        <h1 className="text-lg font-medium">Game Settings</h1>
+      <div className="flex items-center justify-between">
+        <div className="text-secondary-foreground/50 flex items-center gap-2">
+          <SlidersHorizontal size={20} />
+          <h1 className="text-lg font-medium">Game Settings</h1>
+        </div>
+        <Dialog>
+          <DialogTrigger>
+            <Button
+              className="text-primary-foreground font-semibold"
+              variant="destructive"
+              size="sm"
+            >
+              Close Lobby
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <AlertTriangle className="text-destructive" size={20} />
+                End Game Session?
+              </DialogTitle>
+              <DialogDescription className="py-3">
+                This will immediately disconnect all players and close the
+                lobby. You won't be able to resume this session once it's
+                closed.
+              </DialogDescription>
+            </DialogHeader>
+
+            <DialogFooter className="gap-2">
+              <DialogClose asChild>
+                <Button variant="outline" type="button">
+                  Keep Playing
+                </Button>
+              </DialogClose>
+
+              <Button variant="destructive" onClick={handleTerminateGame}>
+                Yes, End Session
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
 
       <div className="scroll-primary flex flex-col gap-6 overflow-y-auto px-2">

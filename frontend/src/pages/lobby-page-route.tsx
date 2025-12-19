@@ -27,7 +27,7 @@ function LobbyPageRouting({ lobby }: { lobby: LobbyState }) {
 
     const handleKicked = (msg: string) => {
       toast.error(msg);
-      navigate("/");
+      navigate("/", { replace: true });
     };
 
     socket.on("connect", onConnect);
@@ -43,7 +43,7 @@ function LobbyPageRouting({ lobby }: { lobby: LobbyState }) {
 
       socket.disconnect();
     };
-  }, []);
+  }, [gameCode, navigate]);
 
   // LATER HERE NEED TO CHECK THE STATUS FOR ROUTING.....
 

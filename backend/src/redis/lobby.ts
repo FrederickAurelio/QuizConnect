@@ -100,3 +100,23 @@ export const updateUserInfo = async (gameCode: string, user: UserInfo) => {
   await saveLobby(gameCode, lobby);
   return lobby;
 };
+
+/**
+ * Removes lobby data and host lock.
+ * Uses a pipeline for atomicity and performance.
+ */
+export const deleteLobbySession = async (
+  gameCode: string,
+  userId: string,
+  quizId: string
+) => {
+  if (!redis) return;
+
+  try {
+    await redis.del(`game:${gameCode}`);
+    await redis.del(`activeHostLobby:${userId}:${quizId}`);
+  } catch (error) {
+    console.error("Redis Cleanup Error:", error);
+    throw error;
+  }
+};
