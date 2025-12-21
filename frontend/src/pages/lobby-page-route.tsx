@@ -29,10 +29,15 @@ function LobbyPageRouting({ lobby }: { lobby: LobbyState }) {
       toast.error(msg);
       navigate("/", { replace: true });
     };
+    
+    const handleError = ({ message }: { message: string }) => {
+      toast.error(message);
+    };
 
     socket.on("connect", onConnect);
     socket.on("lobby-updated", handleLobbyUpdated);
     socket.on("kicked", handleKicked);
+    socket.on("error", handleError);
 
     // 3. Cleanup
     return () => {
@@ -40,6 +45,7 @@ function LobbyPageRouting({ lobby }: { lobby: LobbyState }) {
       socket.off("connect", onConnect);
       socket.off("lobby-updated", handleLobbyUpdated);
       socket.off("kicked", handleKicked);
+      socket.off("error", handleError);
 
       socket.disconnect();
     };

@@ -6,11 +6,24 @@ export type UserInfo = {
   avatar: string;
 };
 
+export type Question = {
+  id: any;
+  question: string;
+  options: {
+    key: "A" | "B" | "C" | "D";
+    text: string;
+  }[];
+  correctKey?: "A" | "B" | "C" | "D" | undefined;
+  done: boolean;
+};
+
 export type QuizInfo = {
   _id: string;
   title: string;
   description: string;
   questionCount: number;
+
+  curQuestion: Question;
 };
 
 export type GameSettings = {
@@ -33,7 +46,14 @@ export type LobbyState = {
     bannedAt: string;
   }[];
   status: "lobby" | "started" | "ended";
-  createdAt: number;
+
+  gameState: {
+    startTime: string;
+    duration: number;
+    status: "question" | "result" | "cooldown";
+    questionIndex: number;
+  };
+  createdAt: string;
 };
 
 export const getLobby = async (
@@ -119,4 +139,26 @@ export const deleteLobbySession = async (
     console.error("Redis Cleanup Error:", error);
     throw error;
   }
+};
+
+/**
+ * QUESTION DATA
+ */
+export const saveQuestions = async (
+  gameCode: string,
+  questions: Question[]
+) => {
+  const secretQuestionsKey = `game:secret:questions:${gameCode}`;
+  await redis.set(secretQuestionsKey, JSON.stringify(questions), {
+    EX: EXPIRY_SECONDS,
+  });
+  return questions;
+};
+
+export const getQuestions = async (
+  gameCode: string
+): Promise<Question[] | null> => {
+  const secretQuestionsKey = `game:secret:questions:${gameCode}`;
+  const data = await redis.get(secretQuestionsKey);
+  return data ? JSON.parse(data) : null;
 };

@@ -1,5 +1,6 @@
 import type { ApiResponse } from "@/api";
 import { api } from "@/lib/axios";
+import type { Question } from "@/pages/create-page";
 
 export type UserInfo = {
   _id: string;
@@ -12,6 +13,8 @@ export type QuizInfo = {
   title: string;
   description: string;
   questionCount: number;
+
+  curQuestion: Question;
 };
 
 export type GameSettings = {
@@ -34,7 +37,14 @@ export type LobbyState = {
     bannedAt: string;
   };
   status: "lobby" | "started" | "ended";
-  createdAt: number;
+
+  gameState: {
+    startTime: string;
+    duration: number;
+    status: "question" | "result" | "cooldown";
+    questionIndex: number;
+  };
+  createdAt: string;
 };
 
 export const hostQuiz = async (quizId: string) => {

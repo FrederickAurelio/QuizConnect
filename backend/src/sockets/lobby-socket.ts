@@ -1,13 +1,18 @@
+import Quiz from "../models/Quiz.js";
 import {
   addPlayer,
   deleteLobbySession,
   getLobby,
+  getQuestions,
+  Question,
   removePlayer,
   saveLobby,
+  saveQuestions,
   updateUserInfo,
   UserInfo,
 } from "../redis/lobby.js";
 import type { Server, Socket } from "socket.io";
+import { shuffleArray } from "../utils/tools.js";
 
 export const setupLobbySocket = (io: Server, socket: Socket) => {
   const user = socket.data.user as UserInfo;
@@ -29,6 +34,53 @@ export const setupLobbySocket = (io: Server, socket: Socket) => {
 
       if (lobby) io.to(gameCode).emit("lobby-updated", lobby);
     }
+  };
+
+  const handleGameFlow = async (gameCode: string, duration: number) => {
+    setTimeout(async () => {
+      const lobby = await getLobby(gameCode);
+      const questions = await getQuestions(gameCode);
+      if (
+        !lobby ||
+        lobby.status !== "started" ||
+        !questions ||
+        questions.length <= 0
+      )
+        return;
+
+      if (lobby.gameState.status === "cooldown") {
+        lobby.gameState.questionIndex += 1;
+        lobby.gameState.duration =
+          Number(lobby.settings.timePerQuestion) * 1000;
+        lobby.gameState.status = "question";
+        lobby.quiz.curQuestion = {
+          ...questions[lobby.gameState.questionIndex],
+          correctKey: undefined,
+        } as Question;
+      } else if (lobby.gameState.status === "question") {
+        lobby.gameState.duration = 5 * 1000;
+        lobby.gameState.status = "result";
+        lobby.quiz.curQuestion = {
+          ...questions[lobby.gameState.questionIndex],
+        } as Question;
+      } else if (
+        lobby.gameState.status === "result" &&
+        lobby.gameState.questionIndex + 1 < questions.length
+      ) {
+        lobby.gameState.duration = Number(lobby.settings.cooldown) * 1000;
+        lobby.gameState.status = "cooldown";
+      } else if (lobby.gameState.status === "result") {
+        lobby.status = "ended";
+      }
+      lobby.gameState.startTime = new Date().toISOString();
+
+      io.to(gameCode).emit("lobby-updated", lobby);
+      await saveLobby(gameCode, lobby);
+
+      if (lobby.status !== "ended") {
+        handleGameFlow(gameCode, lobby.gameState.duration);
+      }
+    }, duration);
   };
 
   // Join a game/lobby
@@ -149,10 +201,48 @@ export const setupLobbySocket = (io: Server, socket: Socket) => {
 
     const lobby = await getLobby(gameCode);
     if (!lobby) return socket.emit("error", { message: "Lobby not found" });
+
+    if (lobby.status !== "lobby")
+      return socket.emit("error", { message: "The game already started" });
+
     if (lobby.host._id !== user._id)
       return socket.emit("error", { message: "Only host can start game" });
 
+    const quiz = await Quiz.findById(lobby.quiz._id);
+    if (!quiz) {
+      return socket.emit("error", { message: "Quiz not found" });
+    }
+
+    let processedQuestions = [...quiz.questions] as Question[];
+
+    if (lobby.settings.shuffleQuestions) {
+      processedQuestions = shuffleArray(processedQuestions);
+    }
+
+    processedQuestions = processedQuestions.slice(
+      0,
+      lobby.settings.questionCount
+    );
+
+    if (lobby.settings.shuffleAnswers) {
+      processedQuestions = processedQuestions.map((q) => ({
+        ...q,
+        options: shuffleArray([...q.options]),
+      }));
+    }
+
+    // 4. Update Lobby State
+    await saveQuestions(gameCode, processedQuestions);
+
     lobby.status = "started";
+    lobby.gameState.questionIndex = -1;
+    lobby.gameState.duration = 30000;
+    lobby.gameState.startTime = new Date().toISOString();
+    lobby.gameState.status = "cooldown";
+
     await saveLobby(gameCode, lobby);
+
+    io.to(gameCode).emit("lobby-updated", lobby);
+    handleGameFlow(gameCode, lobby.gameState.duration);
   });
 };
