@@ -200,10 +200,17 @@ const validateLobbyAccess = async (
     };
   }
 
-  // STILL NEED TO CHECK STATUS HERE.......
-  // IF IT WAS STARTED.. BLOCK JOINING BUT STILL ALLOW CONTINUE.....
-
-  // WHEN CHANGING STATUS TO STARTED.. WE NEED TO BLOCK REMOVE PLAYER AND ADD PLAYER THIS ONE MUST BACKEND YANG HANDLE (REDIS/SOCKET ONE YANG HANDLE)
+  if (
+    lobby.status !== "lobby" &&
+    !(
+      userId === lobby.host._id ||
+      lobby.players.map((u) => u._id).includes(userId as string)
+    )
+  ) {
+    return {
+      errorResponse: { status: 403, message: "The game is already started!" },
+    };
+  }
 
   return { lobby };
 };

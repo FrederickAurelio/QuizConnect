@@ -19,14 +19,16 @@ export const setupLobbySocket = (io: Server, socket: Socket) => {
     let lobby = await getLobby(gameCode);
     if (!lobby) return;
 
-    if (lobby.host._id === user._id) {
-      lobby.host.online = false;
-      await saveLobby(gameCode, lobby);
-    } else {
-      lobby = await removePlayer(gameCode, user._id);
-    }
+    if (lobby.status === "lobby") {
+      if (lobby.host._id === user._id) {
+        lobby.host.online = false;
+        await saveLobby(gameCode, lobby);
+      } else {
+        lobby = await removePlayer(gameCode, user._id);
+      }
 
-    if (lobby) io.to(gameCode).emit("lobby-updated", lobby);
+      if (lobby) io.to(gameCode).emit("lobby-updated", lobby);
+    }
   };
 
   // Join a game/lobby
@@ -39,16 +41,24 @@ export const setupLobbySocket = (io: Server, socket: Socket) => {
     let lobby = await getLobby(gameCode);
     if (!lobby) return socket.emit("error", { message: "Lobby not found" });
 
-    socket.join(gameCode);
-    socket.data.gameCode = gameCode; // track user's lobby
+    if (
+      lobby.status === "lobby" ||
+      user._id === lobby.host._id ||
+      lobby.players.map((u) => u._id).includes(user._id)
+    ) {
+      socket.join(gameCode);
+      socket.data.gameCode = gameCode;
 
-    if (lobby.host._id === user._id) {
-      lobby.host.online = true;
-      await saveLobby(gameCode, lobby);
-    } else {
-      lobby = await addPlayer(gameCode, user);
+      if (lobby.status === "lobby") {
+        if (lobby.host._id === user._id) {
+          lobby.host.online = true;
+          await saveLobby(gameCode, lobby);
+        } else {
+          lobby = await addPlayer(gameCode, user);
+        }
+      }
+      io.to(gameCode).emit("lobby-updated", lobby);
     }
-    io.to(gameCode).emit("lobby-updated", lobby);
   });
 
   // Update settings (only host)
@@ -144,7 +154,5 @@ export const setupLobbySocket = (io: Server, socket: Socket) => {
 
     lobby.status = "started";
     await saveLobby(gameCode, lobby);
-
-    io.to(gameCode).emit("game-started", { gameCode, quiz: lobby.quiz });
   });
 };

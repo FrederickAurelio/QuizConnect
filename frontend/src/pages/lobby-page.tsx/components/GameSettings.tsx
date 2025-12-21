@@ -54,11 +54,15 @@ function GameSettings({
     socket.emit("close-lobby");
   }
 
+  function handleStartGame() {
+    socket.emit("start-game");
+  }
+
   return (
     <div
       className={clsx(
         "bg-sidebar border-border col-span-1 m-10 ml-0 flex min-h-0 w-full flex-1 flex-col gap-6 rounded-2xl border px-5 py-5",
-        !isHost && "pointer-events-none opacity-75",
+        !isHost && "opacity-75",
       )}
     >
       <div className="flex items-center justify-between">
@@ -69,6 +73,7 @@ function GameSettings({
         <Dialog>
           <DialogTrigger>
             <Button
+              disabled={!isHost}
               className="text-primary-foreground font-semibold"
               variant="destructive"
               size="sm"
@@ -111,6 +116,7 @@ function GameSettings({
             <p className="shrink-0 text-white/60">Max Players</p>
             <div className="flex items-center gap-2">
               <Button
+                disabled={!isHost}
                 variant="outline"
                 className="size-8"
                 onClick={() =>
@@ -123,6 +129,7 @@ function GameSettings({
                 <Minus size={14} />
               </Button>
               <Input
+                disabled={!isHost}
                 value={settings.maxPlayers}
                 onChange={(e) =>
                   updateSetting("maxPlayers", parseInt(e.target.value) || 1)
@@ -130,6 +137,7 @@ function GameSettings({
                 className="text-secondary-foreground w-16 text-center font-semibold"
               />
               <Button
+                disabled={!isHost}
                 variant="outline"
                 className="size-8"
                 onClick={() =>
@@ -147,6 +155,7 @@ function GameSettings({
           <div className="flex items-center justify-between gap-3">
             <p className="shrink-0 text-white/60">Questions</p>
             <Select
+              disabled={!isHost}
               value={String(settings.questionCount)}
               onValueChange={(val) =>
                 updateSetting("questionCount", parseInt(val))
@@ -187,6 +196,7 @@ function GameSettings({
               <p className="text-xs text-white/30">Randomize order</p>
             </div>
             <Switch
+              disabled={!isHost}
               size="xl"
               checked={settings.shuffleQuestions}
               onCheckedChange={(val) => updateSetting("shuffleQuestions", val)}
@@ -199,6 +209,7 @@ function GameSettings({
               <p className="text-xs text-white/30">Mix options A-D</p>
             </div>
             <Switch
+              disabled={!isHost}
               size="xl"
               checked={settings.shuffleAnswers}
               onCheckedChange={(val) => updateSetting("shuffleAnswers", val)}
@@ -216,6 +227,7 @@ function GameSettings({
               <p className="text-xs text-white/30">Limit per question</p>
             </div>
             <Select
+              disabled={!isHost}
               value={settings.timePerQuestion}
               onValueChange={(val) => updateSetting("timePerQuestion", val)}
             >
@@ -237,6 +249,7 @@ function GameSettings({
               <p className="text-xs text-white/30">Pause between rounds</p>
             </div>
             <Select
+              disabled={!isHost}
               value={settings.cooldown}
               onValueChange={(val) => updateSetting("cooldown", val)}
             >
@@ -255,7 +268,12 @@ function GameSettings({
       </div>
 
       <div className="mt-auto pt-4">
-        <Button disabled={!isHost} className="w-full font-bold" size="lg">
+        <Button
+          disabled={!isHost}
+          onClick={handleStartGame}
+          className="w-full font-bold"
+          size="lg"
+        >
           START GAME
         </Button>
       </div>

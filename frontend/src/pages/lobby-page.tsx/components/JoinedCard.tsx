@@ -54,7 +54,7 @@ function JoinedCard({
         </div>
       </div>
 
-      <div className="scroll-primary flex w-full flex-1 flex-wrap gap-2 overflow-y-auto">
+      <div className="scroll-primary flex w-full flex-wrap gap-2 overflow-y-auto">
         {players.map((player) => (
           <PlayerBubble
             key={player._id}

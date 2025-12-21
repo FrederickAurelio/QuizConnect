@@ -47,7 +47,7 @@ function LobbyPage({ lobby }: { lobby: LobbyState }) {
   return (
     <div className="grid h-full w-full grid-cols-3">
       {/* LEFT */}
-      <div className="col-span-2 flex flex-col gap-3 p-6">
+      <div className="col-span-2 flex flex-col gap-3 p-6 h-full overflow-hidden">
         <LobbyPageHeader gameCode={gameCode} quizMetadata={quizMetadata} />
         <JoinedCard host={host} players={players} />
       </div>

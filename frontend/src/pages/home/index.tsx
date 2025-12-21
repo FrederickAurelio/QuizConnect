@@ -67,7 +67,7 @@ function LandingPage() {
           <Input
             type="text"
             onChange={(e) => {
-              const trimmedValue = e.target.value.trim();
+              const trimmedValue = e.target.value.trim().toLocaleUpperCase();
               setCodeInput(trimmedValue);
             }}
             onKeyDown={(e) => {
