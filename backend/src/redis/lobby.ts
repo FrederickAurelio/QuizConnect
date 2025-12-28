@@ -4,6 +4,7 @@ export type UserInfo = {
   _id: string;
   username: string;
   avatar: string;
+  totalScore: number;
 };
 
 export type Question = {
@@ -35,12 +36,31 @@ export type GameSettings = {
   cooldown: string;
 };
 
-export type LobbyState = {
+export type FullLobbyState = {
   gameCode: string;
   host: UserInfo & { online: boolean };
   quiz: QuizInfo;
   settings: GameSettings;
   players: UserInfo[];
+  banned: {
+    userId: string;
+    bannedAt: string;
+  }[];
+  status: "lobby" | "started" | "ended";
+
+  gameState: {
+    startTime: string;
+    duration: number;
+    status: "question" | "result" | "cooldown";
+    questionIndex: number;
+  };
+  createdAt: string;
+};
+
+export type LobbyState = {
+  gameCode: string;
+  quiz: QuizInfo;
+  settings: GameSettings;
   banned: {
     userId: string;
     bannedAt: string;
@@ -63,8 +83,28 @@ export const getLobby = async (
   return data ? JSON.parse(data) : null;
 };
 
+export const getFullLobby = async (
+  gameCode: string
+): Promise<FullLobbyState | null> => {
+  const [lobbyRes, hostData, allPlayers] = await Promise.all([
+    getLobby(gameCode),
+    getHostData(gameCode),
+    getAllPlayers(gameCode),
+  ]);
+
+  const lobby: FullLobbyState = {
+    ...(lobbyRes as LobbyState),
+    players: allPlayers,
+    host: hostData as UserInfo & { online: boolean },
+  };
+
+  return lobby;
+};
+
 export const saveLobby = async (gameCode: string, lobby: LobbyState) => {
-  const activeLobbyKey = `activeHostLobby:${lobby.host._id}:${lobby.quiz._id}`;
+  const hostUser = await getHostData(gameCode);
+
+  const activeLobbyKey = `activeHostLobby:${hostUser?._id}:${lobby.quiz._id}`;
   const transaction = redis
     .multi()
     .set(`game:${gameCode}`, JSON.stringify(lobby), {
@@ -75,13 +115,38 @@ export const saveLobby = async (gameCode: string, lobby: LobbyState) => {
   await transaction.exec();
 };
 
+export const getHostData = async (
+  gameCode: string
+): Promise<(UserInfo & { online: boolean }) | null> => {
+  const data = await redis.get(`game:host:${gameCode}`);
+  return data ? JSON.parse(data) : null;
+};
+
+export const saveHostData = async (
+  gameCode: string,
+  hostUser: UserInfo & { online: boolean }
+) => {
+  const activeLobbyKey = `game:host:${gameCode}`;
+  await redis.set(activeLobbyKey, JSON.stringify(hostUser), {
+    EX: EXPIRY_SECONDS,
+  });
+};
+
+export const getAllPlayers = async (gameCode: string): Promise<UserInfo[]> => {
+  const playerKey = `game:players:${gameCode}`;
+  const raw = await redis.hGetAll(playerKey);
+
+  if (!raw || Object.keys(raw).length === 0) return [];
+
+  return Object.values(raw).map((v) => JSON.parse(v));
+};
+
 export const addPlayer = async (gameCode: string, player: UserInfo) => {
   const lobby = await getLobby(gameCode);
   if (!lobby) return null;
-  if (!lobby.players.find((p) => p._id === player._id))
-    lobby.players.push(player);
-  await saveLobby(gameCode, lobby);
-  return lobby;
+
+  const playerKey = `game:players:${gameCode}`;
+  await redis.hSet(playerKey, player._id, JSON.stringify(player));
 };
 
 export const removePlayer = async (
@@ -91,34 +156,48 @@ export const removePlayer = async (
 ) => {
   const lobby = await getLobby(gameCode);
   if (!lobby) return null;
-  lobby.players = lobby.players.filter((p) => p._id !== playerId);
   if (banned) {
     lobby.banned = [
       ...(lobby.banned ?? []).filter((p) => p.userId !== playerId),
       { userId: playerId, bannedAt: new Date().toISOString() },
     ];
   }
-  await saveLobby(gameCode, lobby);
-  return lobby;
+  const playerKey = `game:players:${gameCode}`;
+  const multi = redis.multi();
+  multi.hDel(playerKey, playerId);
+  multi.set(`game:${gameCode}`, JSON.stringify(lobby), { EX: EXPIRY_SECONDS });
+  await multi.exec();
 };
 
-export const updateUserInfo = async (gameCode: string, user: UserInfo) => {
-  const lobby = await getLobby(gameCode);
-  if (!lobby) return null;
+export const updateUserInfo = async (
+  gameCode: string,
+  user: {
+    _id: string;
+    avatar: string;
+    username: string;
+  }
+) => {
+  const [lobby, host] = await Promise.all([
+    getLobby(gameCode),
+    getHostData(gameCode),
+  ]);
+  if (!lobby || !host) return null;
 
-  if (user._id === lobby.host._id) {
-    lobby.host.avatar = user.avatar;
-    lobby.host.username = user.username;
+  if (user._id === host._id) {
+    await saveHostData(gameCode, { ...host, ...user });
   } else {
-    lobby.players = lobby.players.map((player) =>
-      player._id === user._id
-        ? { ...player, username: user.username, avatar: user.avatar }
-        : player
+    const playerKey = `game:players:${gameCode}`;
+    await redis.hSet(
+      playerKey,
+      user._id,
+      JSON.stringify({
+        _id: user._id,
+        username: user.username,
+        avatar: user.avatar,
+        totalScore: 0,
+      })
     );
   }
-
-  await saveLobby(gameCode, lobby);
-  return lobby;
 };
 
 /**
@@ -133,8 +212,10 @@ export const deleteLobbySession = async (
   if (!redis) return;
 
   try {
-    await redis.del(`game:${gameCode}`);
     await redis.del(`activeHostLobby:${userId}:${quizId}`);
+    await redis.del(`game:${gameCode}`);
+    await redis.del(`game:players:${gameCode}`);
+    await redis.del(`game:host:${gameCode}`);
   } catch (error) {
     console.error("Redis Cleanup Error:", error);
     throw error;

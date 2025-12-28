@@ -1,86 +1,127 @@
+import type { Server, Socket } from "socket.io";
 import Quiz from "../models/Quiz.js";
+import { EXPIRY_SECONDS, redis } from "../redis/index.js";
 import {
   addPlayer,
   deleteLobbySession,
+  getAllPlayers,
+  getFullLobby,
+  getHostData,
   getLobby,
   getQuestions,
   Question,
   removePlayer,
+  saveHostData,
   saveLobby,
   saveQuestions,
   updateUserInfo,
   UserInfo,
 } from "../redis/lobby.js";
-import type { Server, Socket } from "socket.io";
 import { shuffleArray } from "../utils/tools.js";
 
+export const handleGameFlow = async (
+  io: Server,
+  gameCode: string,
+  duration: number
+) => {
+  setTimeout(async () => {
+    const [lobby, questions, allPlayers] = await Promise.all([
+      getLobby(gameCode),
+      getQuestions(gameCode),
+      getAllPlayers(gameCode),
+    ]);
+    if (
+      !lobby ||
+      lobby.status !== "started" ||
+      !questions ||
+      questions.length <= 0
+    )
+      return;
+
+    if (lobby.gameState.status === "cooldown") {
+      lobby.gameState.questionIndex += 1;
+      lobby.gameState.duration = Number(lobby.settings.timePerQuestion) * 1000;
+      lobby.gameState.status = "question";
+      lobby.quiz.curQuestion = {
+        ...questions[lobby.gameState.questionIndex],
+        correctKey: undefined,
+      } as Question;
+    } else if (lobby.gameState.status === "question") {
+      lobby.gameState.duration = 5 * 1000;
+      lobby.gameState.status = "result";
+      lobby.quiz.curQuestion = {
+        ...questions[lobby.gameState.questionIndex],
+      } as Question;
+      const correctKey = `game:answer:correct:${gameCode}`;
+      await redis.set(correctKey, allPlayers.length + 1, {
+        EX: EXPIRY_SECONDS,
+      });
+
+      const scoreKey = `game:answer:score:${gameCode}`;
+      const totalScores = await redis.hGetAll(scoreKey);
+
+      const playerKey = `game:players:${gameCode}`;
+
+      const multi = redis.multi();
+      for (const player of allPlayers) {
+        multi.hSet(
+          playerKey,
+          player._id,
+          JSON.stringify({
+            ...player,
+            totalScore: Number(totalScores[player._id] ?? 0),
+          })
+        );
+      }
+      multi.expire(scoreKey, EXPIRY_SECONDS);
+      await multi.exec();
+    } else if (
+      lobby.gameState.status === "result" &&
+      lobby.gameState.questionIndex + 1 < questions.length
+    ) {
+      lobby.gameState.duration = Number(lobby.settings.cooldown) * 1000;
+      lobby.gameState.status = "cooldown";
+    } else if (lobby.gameState.status === "result") {
+      lobby.status = "ended";
+    }
+    lobby.gameState.startTime = new Date().toISOString();
+
+    await saveLobby(gameCode, lobby);
+
+    const emitLobby = await getFullLobby(gameCode);
+    console.log(emitLobby)
+    io.to(gameCode).emit("lobby-updated", emitLobby);
+
+    if (lobby.status !== "ended") {
+      handleGameFlow(io, gameCode, lobby.gameState.duration);
+    }
+  }, duration);
+};
+
 export const setupLobbySocket = (io: Server, socket: Socket) => {
-  const user = socket.data.user as UserInfo;
+  const user = { ...socket.data.user, totalScore: 0 } as UserInfo;
 
   const handleLeaveLobby = async () => {
     const gameCode = socket.data.gameCode;
     if (!gameCode) return;
 
-    let lobby = await getLobby(gameCode);
-    if (!lobby) return;
+    const [lobby, hostUser] = await Promise.all([
+      getLobby(gameCode),
+      getHostData(gameCode),
+    ]);
+
+    if (!lobby || !hostUser) return;
 
     if (lobby.status === "lobby") {
-      if (lobby.host._id === user._id) {
-        lobby.host.online = false;
-        await saveLobby(gameCode, lobby);
+      if (hostUser?._id === user._id) {
+        await saveHostData(gameCode, { ...hostUser, online: false });
       } else {
-        lobby = await removePlayer(gameCode, user._id);
+        await removePlayer(gameCode, user._id);
       }
 
-      if (lobby) io.to(gameCode).emit("lobby-updated", lobby);
+      const emitLobby = await getFullLobby(gameCode);
+      io.to(gameCode).emit("lobby-updated", emitLobby);
     }
-  };
-
-  const handleGameFlow = async (gameCode: string, duration: number) => {
-    setTimeout(async () => {
-      const lobby = await getLobby(gameCode);
-      const questions = await getQuestions(gameCode);
-      if (
-        !lobby ||
-        lobby.status !== "started" ||
-        !questions ||
-        questions.length <= 0
-      )
-        return;
-
-      if (lobby.gameState.status === "cooldown") {
-        lobby.gameState.questionIndex += 1;
-        lobby.gameState.duration =
-          Number(lobby.settings.timePerQuestion) * 1000;
-        lobby.gameState.status = "question";
-        lobby.quiz.curQuestion = {
-          ...questions[lobby.gameState.questionIndex],
-          correctKey: undefined,
-        } as Question;
-      } else if (lobby.gameState.status === "question") {
-        lobby.gameState.duration = 5 * 1000;
-        lobby.gameState.status = "result";
-        lobby.quiz.curQuestion = {
-          ...questions[lobby.gameState.questionIndex],
-        } as Question;
-      } else if (
-        lobby.gameState.status === "result" &&
-        lobby.gameState.questionIndex + 1 < questions.length
-      ) {
-        lobby.gameState.duration = Number(lobby.settings.cooldown) * 1000;
-        lobby.gameState.status = "cooldown";
-      } else if (lobby.gameState.status === "result") {
-        lobby.status = "ended";
-      }
-      lobby.gameState.startTime = new Date().toISOString();
-
-      io.to(gameCode).emit("lobby-updated", lobby);
-      await saveLobby(gameCode, lobby);
-
-      if (lobby.status !== "ended") {
-        handleGameFlow(gameCode, lobby.gameState.duration);
-      }
-    }, duration);
   };
 
   // Join a game/lobby
@@ -90,7 +131,8 @@ export const setupLobbySocket = (io: Server, socket: Socket) => {
       socket.leave(currentLobby);
     }
 
-    let lobby = await getLobby(gameCode);
+    const lobby = await getFullLobby(gameCode);
+
     if (!lobby) return socket.emit("error", { message: "Lobby not found" });
 
     if (
@@ -103,13 +145,14 @@ export const setupLobbySocket = (io: Server, socket: Socket) => {
 
       if (lobby.status === "lobby") {
         if (lobby.host._id === user._id) {
-          lobby.host.online = true;
-          await saveLobby(gameCode, lobby);
+          await saveHostData(gameCode, { ...lobby.host, online: true });
         } else {
-          lobby = await addPlayer(gameCode, user);
+          await addPlayer(gameCode, user);
         }
       }
-      io.to(gameCode).emit("lobby-updated", lobby);
+
+      const emitLobby = await getFullLobby(gameCode);
+      io.to(gameCode).emit("lobby-updated", emitLobby);
     }
   });
 
@@ -119,8 +162,12 @@ export const setupLobbySocket = (io: Server, socket: Socket) => {
     if (!gameCode) return socket.emit("error", { message: "Not in a lobby" });
 
     const lobby = await getLobby(gameCode);
-    if (!lobby) return socket.emit("error", { message: "Lobby not found" });
-    if (lobby.host._id !== user._id)
+    const hostData = await getHostData(gameCode);
+
+    if (!lobby || !hostData)
+      return socket.emit("error", { message: "Lobby not found" });
+
+    if (hostData?._id !== user._id)
       return socket.emit("error", {
         message: "Only host can update settings",
       });
@@ -128,7 +175,8 @@ export const setupLobbySocket = (io: Server, socket: Socket) => {
     lobby.settings = { ...lobby.settings, ...settings };
     await saveLobby(gameCode, lobby);
 
-    io.to(gameCode).emit("lobby-updated", lobby);
+    const emitLobby = await getFullLobby(gameCode);
+    io.to(gameCode).emit("lobby-updated", emitLobby);
   });
 
   // Update Profile
@@ -144,7 +192,8 @@ export const setupLobbySocket = (io: Server, socket: Socket) => {
       });
       if (!lobby) return socket.emit("error", { message: "Lobby not found" });
 
-      io.to(gameCode).emit("lobby-updated", lobby);
+      const emitLobby = await getFullLobby(gameCode);
+      io.to(gameCode).emit("lobby-updated", emitLobby);
     }
   );
 
@@ -153,12 +202,16 @@ export const setupLobbySocket = (io: Server, socket: Socket) => {
     const gameCode = socket.data.gameCode;
     if (!gameCode) return socket.emit("error", { message: "Not in a lobby" });
 
-    let lobby = await getLobby(gameCode);
-    if (!lobby) return socket.emit("error", { message: "Lobby not found" });
+    const lobby = await getLobby(gameCode);
+    const hostData = await getHostData(gameCode);
 
-    if (lobby.host._id !== user._id) {
-      return socket.emit("error", { message: "Only host can close lobby" });
-    }
+    if (!lobby || !hostData)
+      return socket.emit("error", { message: "Lobby not found" });
+
+    if (hostData?._id !== user._id)
+      return socket.emit("error", {
+        message: "Only host can update settings",
+      });
 
     try {
       io.to(gameCode).emit("kicked", "The host has closed the lobby.");
@@ -173,22 +226,86 @@ export const setupLobbySocket = (io: Server, socket: Socket) => {
     }
   });
 
+  socket.on(
+    "submit-answer",
+    async ({
+      optionIndex,
+      key,
+    }: {
+      optionIndex: number;
+      key: "A" | "B" | "C" | "D";
+    }) => {
+      const gameCode = socket.data.gameCode;
+      if (!gameCode) return socket.emit("error", { message: "Not in a lobby" });
+
+      const lobby = await getLobby(gameCode);
+      const questions = await getQuestions(gameCode);
+      if (!lobby || !questions)
+        return socket.emit("error", { message: "Not in a lobby" });
+
+      if (lobby.gameState.status !== "question")
+        return socket.emit("error", { message: "Time is up!" });
+
+      const qIndex = lobby.gameState.questionIndex;
+      const curQuestion = questions[qIndex] as Question;
+
+      const questionKey = `game:answer:answers:${gameCode}:${qIndex}`;
+      const scoreKey = `game:answer:score:${gameCode}`;
+      const correctKey = `game:answer:correct:${gameCode}`;
+
+      const isFirstTime = await redis.hSetNX(
+        questionKey,
+        user._id,
+        JSON.stringify({ optionIndex, key, score: 0 }) // Placeholder
+      );
+
+      if (!isFirstTime) {
+        return socket.emit("error", {
+          message: "You already answered this question!",
+        });
+      }
+
+      if (curQuestion.correctKey === key) {
+        const remaining = await redis.decr(correctKey);
+        const scoreYouGet = Math.max(remaining, 0);
+
+        await redis.hSet(
+          questionKey,
+          user._id,
+          JSON.stringify({
+            optionIndex,
+            key,
+            score: scoreYouGet,
+          })
+        );
+
+        await redis.hIncrBy(scoreKey, user._id, scoreYouGet);
+      }
+    }
+  );
+
   // Kick Player
   socket.on("kick-player", async (userId: string) => {
     const gameCode = socket.data.gameCode;
     if (!gameCode) return socket.emit("error", { message: "Not in a lobby" });
 
-    let lobby = await getLobby(gameCode);
-    if (!lobby) return socket.emit("error", { message: "Lobby not found" });
-    if (lobby.host._id !== user._id)
+    const [lobby, hostUser] = await Promise.all([
+      getLobby(gameCode),
+      getHostData(gameCode),
+    ]);
+
+    if (!lobby || !hostUser)
+      return socket.emit("error", { message: "Lobby not found" });
+    if (hostUser._id !== user._id)
       return socket.emit("error", {
         message: "Only host can update settings",
       });
 
-    lobby = await removePlayer(gameCode, userId, true);
+    await removePlayer(gameCode, userId, true);
 
     io.to(`user:${userId}`).emit("kicked", "You were kicked from the lobby");
-    io.to(gameCode).emit("lobby-updated", lobby);
+    const emitLobby = await getFullLobby(gameCode);
+    io.to(gameCode).emit("lobby-updated", emitLobby);
   });
 
   socket.on("leave-game", handleLeaveLobby);
@@ -199,13 +316,24 @@ export const setupLobbySocket = (io: Server, socket: Socket) => {
     const gameCode = socket.data.gameCode;
     if (!gameCode) return socket.emit("error", { message: "Not in a lobby" });
 
-    const lobby = await getLobby(gameCode);
-    if (!lobby) return socket.emit("error", { message: "Lobby not found" });
+    const wasAlreadyStarted = await redis.getSet(
+      `game:started:${gameCode}`,
+      "true"
+    );
+    if (wasAlreadyStarted) return;
+
+    const [lobby, hostUser, allPlayers] = await Promise.all([
+      getLobby(gameCode),
+      getHostData(gameCode),
+      getAllPlayers(gameCode),
+    ]);
+    if (!lobby || !hostUser || !allPlayers)
+      return socket.emit("error", { message: "Lobby not found" });
 
     if (lobby.status !== "lobby")
       return socket.emit("error", { message: "The game already started" });
 
-    if (lobby.host._id !== user._id)
+    if (hostUser._id !== user._id)
       return socket.emit("error", { message: "Only host can start game" });
 
     const quiz = await Quiz.findById(lobby.quiz._id);
@@ -231,18 +359,42 @@ export const setupLobbySocket = (io: Server, socket: Socket) => {
       }));
     }
 
-    // 4. Update Lobby State
-    await saveQuestions(gameCode, processedQuestions);
-
     lobby.status = "started";
     lobby.gameState.questionIndex = -1;
     lobby.gameState.duration = 30000;
     lobby.gameState.startTime = new Date().toISOString();
     lobby.gameState.status = "cooldown";
 
-    await saveLobby(gameCode, lobby);
+    const scoreKey = `game:answer:score:${gameCode}`;
+    const correctKey = `game:answer:correct:${gameCode}`;
+    const multi = redis.multi();
 
-    io.to(gameCode).emit("lobby-updated", lobby);
-    handleGameFlow(gameCode, lobby.gameState.duration);
+    for (const player of allPlayers) {
+      multi.hSet(scoreKey, player._id, 0);
+    }
+    multi.expire(scoreKey, EXPIRY_SECONDS);
+
+    processedQuestions.forEach((_, qIndex) => {
+      const questionKey = `game:answer:answers:${gameCode}:${qIndex}`;
+      for (const player of allPlayers) {
+        multi.hSet(
+          questionKey,
+          player._id,
+          JSON.stringify({ optionIndex: null, key: null, score: 0 })
+        );
+      }
+      multi.expire(questionKey, EXPIRY_SECONDS);
+    });
+
+    await Promise.all([
+      multi.exec(),
+      redis.set(correctKey, allPlayers.length + 1, { EX: EXPIRY_SECONDS }),
+      saveQuestions(gameCode, processedQuestions),
+      saveLobby(gameCode, lobby),
+    ]);
+
+    const emitLobby = await getFullLobby(gameCode);
+    io.to(gameCode).emit("lobby-updated", emitLobby);
+    handleGameFlow(io, gameCode, lobby.gameState.duration);
   });
 };

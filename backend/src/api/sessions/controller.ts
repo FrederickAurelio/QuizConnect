@@ -5,7 +5,7 @@ import { EXPIRY_SECONDS, redis } from "../../redis/index.js";
 import Quiz from "../../models/Quiz.js";
 import { Types } from "mongoose";
 import { handleControllerError } from "../../utils/handle-control-error.js";
-import { LobbyState } from "../../redis/lobby.js";
+import { getFullLobby, LobbyState } from "../../redis/lobby.js";
 
 type PopulatedCreator = {
   _id: Types.ObjectId;
@@ -73,10 +73,6 @@ export const hostQuiz = async (req: Request, res: Response) => {
         const oldLobbyState: LobbyState = JSON.parse(lobbyExists);
         oldLobbyState.quiz.description = quiz.description;
         oldLobbyState.quiz.title = quiz.title;
-        oldLobbyState.host.username =
-          req.session.username ?? oldLobbyState.host.username;
-        oldLobbyState.host.avatar =
-          req.session.avatar ?? oldLobbyState.host.avatar;
         if (oldLobbyState.quiz.questionCount !== quiz.questions.length) {
           oldLobbyState.quiz.questionCount = quiz.questions.length;
           oldLobbyState.settings.questionCount = quiz.questions.length;
@@ -104,12 +100,6 @@ export const hostQuiz = async (req: Request, res: Response) => {
 
     const lobbyState = {
       gameCode,
-      host: {
-        _id: userId,
-        username: quiz.creatorId.username,
-        avatar: quiz.creatorId.avatar,
-        online: true,
-      },
       quiz: {
         _id: quizId,
         title: quiz.title,
@@ -124,7 +114,6 @@ export const hostQuiz = async (req: Request, res: Response) => {
         timePerQuestion: "20",
         cooldown: "5",
       },
-      players: [],
       banned: [],
       status: "lobby",
       gameState: {},
@@ -136,6 +125,15 @@ export const hostQuiz = async (req: Request, res: Response) => {
       .set(`game:${gameCode}`, JSON.stringify(lobbyState), {
         EX: EXPIRY_SECONDS,
       })
+      .set(
+        `game:host:${gameCode}`,
+        JSON.stringify({
+          _id: userId,
+          username: quiz.creatorId.username,
+          avatar: quiz.creatorId.avatar,
+          online: true,
+        })
+      )
       .set(activeLobbyKey, gameCode, { EX: EXPIRY_SECONDS });
 
     await transaction.exec();
@@ -161,14 +159,12 @@ const validateLobbyAccess = async (
   userId?: string | Types.ObjectId | undefined
 ) => {
   // 1️⃣ Fetch lobby from Redis
-  const lobbyStr = await redis.get(`game:${gameCode}`);
-  if (!lobbyStr) {
+  const lobby = await getFullLobby(gameCode);
+  if (!lobby) {
     return {
       errorResponse: { status: 404, message: "Lobby not found or expired" },
     };
   }
-
-  const lobby: LobbyState = JSON.parse(lobbyStr);
 
   // 2️⃣ Check Ban Status
   const BAN_DURATION_MS = 5 * 60 * 1000;
