@@ -19,22 +19,42 @@ import {
 } from "../redis/lobby.js";
 import { shuffleArray } from "../utils/tools.js";
 
+type ParsedAnswer = {
+  optionIndex: number | null;
+  key: "A" | "B" | "C" | "D" | null;
+  score: number;
+};
+
+export const parseRedisHash = <T = any>(
+  raw: Record<string, string>
+): Record<string, T> => {
+  const result: Record<string, T> = {};
+
+  for (const [key, value] of Object.entries(raw)) {
+    result[key] = JSON.parse(value);
+  }
+
+  return result;
+};
+
 export const handleGameFlow = async (
   io: Server,
   gameCode: string,
   duration: number
 ) => {
   setTimeout(async () => {
-    const [lobby, questions, allPlayers] = await Promise.all([
+    const [lobby, questions, allPlayers, hostUser] = await Promise.all([
       getLobby(gameCode),
       getQuestions(gameCode),
       getAllPlayers(gameCode),
+      getHostData(gameCode),
     ]);
     if (
       !lobby ||
       lobby.status !== "started" ||
       !questions ||
-      questions.length <= 0
+      questions.length <= 0 ||
+      !hostUser
     )
       return;
 
@@ -87,9 +107,16 @@ export const handleGameFlow = async (
     lobby.gameState.startTime = new Date().toISOString();
 
     await saveLobby(gameCode, lobby);
-
     const emitLobby = await getFullLobby(gameCode);
-    console.log(emitLobby)
+
+    if (lobby.gameState.status === "question") {
+      const questionKey = `game:answer:answers:${gameCode}:${lobby.gameState.questionIndex}`;
+      const rawAnswers = await redis.hGetAll(questionKey);
+      const playersAnswer = parseRedisHash(rawAnswers);
+
+      io.to(`user:${hostUser?._id}`).emit("question-dashboard", playersAnswer);
+    }
+
     io.to(gameCode).emit("lobby-updated", emitLobby);
 
     if (lobby.status !== "ended") {
@@ -153,6 +180,16 @@ export const setupLobbySocket = (io: Server, socket: Socket) => {
 
       const emitLobby = await getFullLobby(gameCode);
       io.to(gameCode).emit("lobby-updated", emitLobby);
+
+      if (user._id === lobby.host._id) {
+        const questionKey = `game:answer:answers:${gameCode}:${lobby.gameState.questionIndex}`;
+        const rawAnswers = await redis.hGetAll(questionKey);
+        const playersAnswer = parseRedisHash(rawAnswers);
+        io.to(`user:${lobby.host?._id}`).emit(
+          "question-dashboard",
+          playersAnswer
+        );
+      }
     }
   });
 
@@ -238,9 +275,13 @@ export const setupLobbySocket = (io: Server, socket: Socket) => {
       const gameCode = socket.data.gameCode;
       if (!gameCode) return socket.emit("error", { message: "Not in a lobby" });
 
-      const lobby = await getLobby(gameCode);
-      const questions = await getQuestions(gameCode);
-      if (!lobby || !questions)
+      const [lobby, questions, hostUser] = await Promise.all([
+        getLobby(gameCode),
+        getQuestions(gameCode),
+        getHostData(gameCode),
+      ]);
+
+      if (!lobby || !questions || !hostUser)
         return socket.emit("error", { message: "Not in a lobby" });
 
       if (lobby.gameState.status !== "question")
@@ -281,6 +322,10 @@ export const setupLobbySocket = (io: Server, socket: Socket) => {
 
         await redis.hIncrBy(scoreKey, user._id, scoreYouGet);
       }
+
+      const rawAnswers = await redis.hGetAll(questionKey);
+      const playersAnswer = parseRedisHash(rawAnswers);
+      io.to(`user:${hostUser?._id}`).emit("question-dashboard", playersAnswer);
     }
   );
 

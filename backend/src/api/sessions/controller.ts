@@ -244,6 +244,61 @@ export const getLobby = async (req: Request, res: Response) => {
   }
 };
 
+export const getYourAnswer = async (req: Request, res: Response) => {
+  try {
+    const { gameCode } = req.params;
+    if (!gameCode) {
+      return res
+        .status(404)
+        .json({ message: "Game code is required", data: null, errors: null });
+    }
+
+    const lobby = await getFullLobby(gameCode);
+    if (!lobby || lobby.status === "lobby")
+      return res.status(404).json({
+        message: "Lobby not found or not started yet",
+        data: null,
+        errors: null,
+      });
+
+    const count = lobby.settings.questionCount;
+    const multi = redis.multi();
+
+    for (let i = 0; i < count; i++) {
+      const key = `game:answer:answers:${gameCode}:${i}`;
+      multi.hGet(key, req.session.userId as string);
+    }
+
+    const results = await multi.exec();
+
+    if (!results) {
+      return res.status(400).json({
+        message: "Result not found or expired",
+        data: null,
+        errors: null,
+      });
+    }
+
+    const yourAnswer = results.map((r) => {
+      if (typeof r === "string") {
+        try {
+          return JSON.parse(r);
+        } catch (e) {
+          return { optionIndex: null, key: null, score: 0 };
+        }
+      }
+      return { optionIndex: null, key: null, score: 0 };
+    });
+    return res.status(200).json({
+      message: "Answers fetched successfully",
+      data: yourAnswer,
+      errors: null,
+    });
+  } catch (error) {
+    return handleControllerError(res, error);
+  }
+};
+
 export const checkLobbyStatus = async (req: Request, res: Response) => {
   try {
     const { gameCode } = req.params;

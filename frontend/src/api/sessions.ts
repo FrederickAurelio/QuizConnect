@@ -2,6 +2,12 @@ import type { ApiResponse } from "@/api";
 import { api } from "@/lib/axios";
 import type { Question } from "@/pages/create-page";
 
+export type AnswerLog = {
+  optionIndex: number | null;
+  key: ("A" | "B" | "C" | "D") | null;
+  score: number;
+};
+
 export type UserInfo = {
   _id: string;
   username: string;
@@ -59,6 +65,13 @@ export const hostQuiz = async (quizId: string) => {
 
 export const getLobby = async (gameCode: string) => {
   const res = await api.get<ApiResponse<LobbyState>>(`/sessions/${gameCode}`);
+  return res.data;
+};
+
+export const getYourAnswer = async (gameCode: string) => {
+  const res = await api.get<ApiResponse<AnswerLog[]>>(
+    `/sessions/answer/${gameCode}`,
+  );
   return res.data;
 };
 

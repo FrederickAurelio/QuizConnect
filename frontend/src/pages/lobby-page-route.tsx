@@ -1,4 +1,10 @@
-import { getLobby, type LobbyState } from "@/api/sessions";
+import {
+  getLobby,
+  getYourAnswer,
+  type AnswerLog,
+  type LobbyState,
+} from "@/api/sessions";
+import { useLogin } from "@/contexts/login-context";
 import { handleGeneralError } from "@/lib/axios";
 import { socket } from "@/lib/socket";
 import LoadingPage from "@/pages/loading-page";
@@ -9,10 +15,35 @@ import { Navigate, useNavigate, useParams } from "react-router";
 import { toast } from "sonner";
 
 function LobbyPageRouting({ lobby }: { lobby: LobbyState }) {
+  const { user } = useLogin();
   const navigate = useNavigate();
   const { gameCode } = lobby;
 
   const [lobbyState, setLobbyState] = useState<LobbyState>(lobby);
+  const [playersAnswer, setPlayerAnswer] = useState<Record<string, AnswerLog>>(
+    {},
+  );
+
+  const answerFetchenabled =
+    !!gameCode &&
+    !!lobbyState &&
+    lobbyState?.status !== "lobby" &&
+    lobbyState.host._id !== user?.userId;
+
+  const { data: myAnswerRes } = useQuery({
+    queryKey: ["YourAnswer", gameCode, user?.userId],
+    queryFn: () => getYourAnswer(gameCode!),
+    enabled: answerFetchenabled,
+    staleTime: 0,
+    gcTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: false,
+  });
+  // THIS LATER NEED TO GIVE FOR THE USER IN THEIR QUESTION JAWAB PAGE (PLAYER)
+  const myAnswer = myAnswerRes?.data;
+
+  // THIS LATER NEED TO GIVE TO THE HOST in THEIR DASHBOARD (HOST)
+  // const [playersAnswer, setPlayerAnswer]
 
   useEffect(() => {
     socket.connect();
@@ -29,7 +60,11 @@ function LobbyPageRouting({ lobby }: { lobby: LobbyState }) {
       toast.error(msg);
       navigate("/", { replace: true });
     };
-    
+
+    const handlePlayersAnswer = (playersAnswer: Record<string, AnswerLog>) => {
+      setPlayerAnswer(playersAnswer);
+    };
+
     const handleError = ({ message }: { message: string }) => {
       toast.error(message);
     };
@@ -37,6 +72,7 @@ function LobbyPageRouting({ lobby }: { lobby: LobbyState }) {
     socket.on("connect", onConnect);
     socket.on("lobby-updated", handleLobbyUpdated);
     socket.on("kicked", handleKicked);
+    socket.on("question-dashboard", handlePlayersAnswer); // host only
     socket.on("error", handleError);
 
     // 3. Cleanup
@@ -45,6 +81,7 @@ function LobbyPageRouting({ lobby }: { lobby: LobbyState }) {
       socket.off("connect", onConnect);
       socket.off("lobby-updated", handleLobbyUpdated);
       socket.off("kicked", handleKicked);
+      socket.off("question-dashboard", handlePlayersAnswer);
       socket.off("error", handleError);
 
       socket.disconnect();
@@ -58,29 +95,35 @@ function LobbyPageRouting({ lobby }: { lobby: LobbyState }) {
 
 function LobbyPageRoute() {
   const { gameCode } = useParams();
-  const { data, isPending, isLoading, isFetched, isFetching, isError, error } =
-    useQuery({
-      queryKey: ["LobbyState", gameCode],
-      queryFn: () => getLobby(gameCode!),
-      enabled: !!gameCode,
-      staleTime: 0,
-      gcTime: 0,
-      refetchOnMount: "always",
-      refetchOnWindowFocus: false,
-    });
+
+  const lobbyQuery = useQuery({
+    queryKey: ["LobbyState", gameCode],
+    queryFn: () => getLobby(gameCode!),
+    enabled: !!gameCode,
+    staleTime: 0,
+    gcTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: false,
+  });
+
+  const lobby = lobbyQuery.data?.data;
 
   if (!gameCode) return <Navigate to="/" replace />;
-  if (isPending || isLoading || !isFetched || isFetching)
+
+  if (
+    lobbyQuery.isPending ||
+    lobbyQuery.isLoading ||
+    !lobbyQuery.isFetched ||
+    lobbyQuery.isFetching
+  ) {
     return <LoadingPage />;
+  }
 
-  const lobby = data?.data;
-
-  if (!lobby || isError) {
-    handleGeneralError(error as any);
+  if (!lobby || lobbyQuery.isError) {
+    handleGeneralError(lobbyQuery.error as any);
     return <Navigate to="/" replace />;
   }
 
   return <LobbyPageRouting lobby={lobby} />;
 }
-
 export default LobbyPageRoute;
