@@ -110,8 +110,9 @@ export const handleGameFlow = async (
     await saveLobby(gameCode, lobby);
     const emitLobby = await getFullLobby(gameCode);
 
+    // after cooldown mode, because this was just set to question
     if (lobby.gameState.status === "question") {
-      const questionKey = `game:answer:answers:${gameCode}:${lobby.gameState.questionIndex}`;
+      const questionKey = `game:answer:answers:${gameCode}:${lobby.gameState.questionIndex}`; // new qIndex
       const rawAnswers = await redis.hGetAll(questionKey);
       const playersAnswer = parseRedisHash(rawAnswers);
 

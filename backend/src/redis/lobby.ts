@@ -1,5 +1,11 @@
 import { EXPIRY_SECONDS, redis } from "./index.js";
 
+export type AnswerLog = {
+  optionIndex: number | null;
+  key: ("A" | "B" | "C" | "D") | null;
+  score: number;
+};
+
 export type UserInfo = {
   _id: string;
   username: string;

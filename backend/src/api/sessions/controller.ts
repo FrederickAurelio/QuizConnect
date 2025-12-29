@@ -5,7 +5,7 @@ import { EXPIRY_SECONDS, redis } from "../../redis/index.js";
 import Quiz from "../../models/Quiz.js";
 import { Types } from "mongoose";
 import { handleControllerError } from "../../utils/handle-control-error.js";
-import { getFullLobby, LobbyState } from "../../redis/lobby.js";
+import { AnswerLog, getFullLobby, LobbyState } from "../../redis/lobby.js";
 
 type PopulatedCreator = {
   _id: Types.ObjectId;
@@ -279,19 +279,19 @@ export const getYourAnswer = async (req: Request, res: Response) => {
       });
     }
 
-    const yourAnswer = results.map((r) => {
+    const yourAnswer: AnswerLog[] = results.map((r) => {
       if (typeof r === "string") {
         try {
           return JSON.parse(r);
         } catch (e) {
-          return { optionIndex: null, key: null, score: 0 };
+          return { optionIndex: null, key: null };
         }
       }
-      return { optionIndex: null, key: null, score: 0 };
+      return { optionIndex: null, key: null };
     });
     return res.status(200).json({
       message: "Answers fetched successfully",
-      data: yourAnswer,
+      data: yourAnswer.map((y) => ({ ...y, score: undefined })),
       errors: null,
     });
   } catch (error) {
