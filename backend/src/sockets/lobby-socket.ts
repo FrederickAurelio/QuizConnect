@@ -72,10 +72,6 @@ export const handleGameFlow = async (
       lobby.quiz.curQuestion = {
         ...questions[lobby.gameState.questionIndex],
       } as Question;
-      const correctKey = `game:answer:correct:${gameCode}`;
-      await redis.set(correctKey, allPlayers.length + 1, {
-        EX: EXPIRY_SECONDS,
-      });
 
       const scoreKey = `game:answer:score:${gameCode}`;
       const totalScores = await redis.hGetAll(scoreKey);
@@ -99,6 +95,11 @@ export const handleGameFlow = async (
       lobby.gameState.status === "result" &&
       lobby.gameState.questionIndex + 1 < questions.length
     ) {
+      const correctKey = `game:answer:correct:${gameCode}`;
+      await redis.set(correctKey, allPlayers.length + 1, {
+        EX: EXPIRY_SECONDS,
+      });
+
       lobby.gameState.duration = Number(lobby.settings.cooldown) * 1000;
       lobby.gameState.status = "cooldown";
     } else if (lobby.gameState.status === "result") {
