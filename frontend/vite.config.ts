@@ -12,6 +12,10 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, ""), // removes /api prefix
       },
+      "/socket.io": {
+        target: "http://localhost:2000",
+        ws: true, // <--- important for socket.io
+      },
     },
   },
   plugins: [react(), tailwindcss()],
