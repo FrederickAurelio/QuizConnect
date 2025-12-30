@@ -20,9 +20,7 @@ function LobbyPageRouting({ lobby }: { lobby: LobbyState }) {
   const { gameCode } = lobby;
 
   const [lobbyState, setLobbyState] = useState<LobbyState>(lobby);
-  const [playersAnswer, setPlayerAnswer] = useState<Record<string, AnswerLog>>(
-    {},
-  );
+  const [playersAnswer, setPlayerAnswer] = useState<AnswerLog[]>([]);
 
   const answerFetchenabled =
     !!gameCode &&
@@ -61,7 +59,7 @@ function LobbyPageRouting({ lobby }: { lobby: LobbyState }) {
       navigate("/", { replace: true });
     };
 
-    const handlePlayersAnswer = (playersAnswer: Record<string, AnswerLog>) => {
+    const handlePlayersAnswer = (playersAnswer: AnswerLog[]) => {
       setPlayerAnswer(playersAnswer);
     };
 

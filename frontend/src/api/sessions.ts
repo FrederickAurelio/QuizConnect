@@ -3,6 +3,7 @@ import { api } from "@/lib/axios";
 import type { Question } from "@/pages/create-page";
 
 export type AnswerLog = {
+  _id: string;
   optionIndex: number | null;
   key: ("A" | "B" | "C" | "D") | null;
   score?: number;

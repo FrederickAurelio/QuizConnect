@@ -20,6 +20,7 @@ import {
 import { shuffleArray } from "../utils/tools.js";
 
 type ParsedAnswer = {
+  _id: string;
   optionIndex: number | null;
   key: "A" | "B" | "C" | "D" | null;
   score: number;
@@ -27,15 +28,11 @@ type ParsedAnswer = {
 
 export const parseRedisHash = <T = any>(
   raw: Record<string, string>
-): Record<string, T> => {
-  const result: Record<string, T> = {};
-
-  for (const [key, value] of Object.entries(raw)) {
-    result[key] = JSON.parse(value);
-  }
-
-  return result;
-};
+): ParsedAnswer[] =>
+  Object.entries(raw).map(([playerId, json]) => ({
+    _id: playerId,
+    ...JSON.parse(json),
+  }));
 
 export const handleGameFlow = async (
   io: Server,
@@ -90,6 +87,7 @@ export const handleGameFlow = async (
         );
       }
       multi.expire(scoreKey, EXPIRY_SECONDS);
+      multi.expire(playerKey, EXPIRY_SECONDS);
       await multi.exec();
     } else if (
       lobby.gameState.status === "result" &&
