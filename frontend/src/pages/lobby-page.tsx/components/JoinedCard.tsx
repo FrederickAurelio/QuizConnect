@@ -1,7 +1,9 @@
 import type { UserInfo } from "@/api/sessions";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useEditProfile } from "@/contexts/edit-profile-context";
 import { useLogin } from "@/contexts/login-context";
 import PlayerBubble from "@/pages/lobby-page.tsx/components/PlayerBubble";
+import { AvatarImage } from "@radix-ui/react-avatar";
 import clsx from "clsx";
 import { Dot, Info, Users } from "lucide-react";
 
@@ -24,9 +26,16 @@ function JoinedCard({
           {players.length} Players Joined
         </h1>
         <div className="bg-secondary/30 hover:bg-secondary/50 flex h-fit max-w-[240px] items-center gap-1 rounded-xl p-2 pr-3 transition-colors duration-150 ease-in-out">
-          <div className="bg-primary/15 shrink-0 rounded-full p-1.5">
-            <img className="size-5" src={host.avatar ?? ""} alt="host-avatar" />
-          </div>
+          <Avatar className="size-8 p-2">
+            <AvatarImage src={host?.avatar ?? ""} />
+            <AvatarFallback>
+              {host?.username
+                .split(" ")
+                .map((word) => word[0]?.toUpperCase())
+                .slice(0, 2)
+                .join("")}
+            </AvatarFallback>
+          </Avatar>
           <div className="flex shrink-0 items-center">
             <Dot
               className={clsx(

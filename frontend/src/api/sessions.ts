@@ -13,6 +13,7 @@ export type UserInfo = {
   _id: string;
   username: string;
   avatar: string;
+  totalScore?: number;
 };
 
 export type QuizInfo = {

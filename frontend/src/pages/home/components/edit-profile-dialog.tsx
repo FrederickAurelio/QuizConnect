@@ -1,4 +1,5 @@
 import { editProfile, type ProfileUserResponse } from "@/api/auth";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -108,11 +109,16 @@ function EditProfileDialog({ open, onOpenChange }: Props) {
         <div className="flex flex-col gap-2">
           <h2 className="text-sm font-semibold text-white/60">Preview</h2>
           <div className="flex items-center gap-2">
-            <img
-              className="bg-secondary size-12 rounded-full p-2"
-              src={data?.avatar}
-              alt="avatar"
-            />
+            <Avatar className="size-12 p-2">
+              <AvatarImage src={data?.avatar ?? ""} />
+              <AvatarFallback>
+                {data?.username
+                  .split(" ")
+                  .map((word) => word[0]?.toUpperCase())
+                  .slice(0, 2)
+                  .join("")}
+              </AvatarFallback>
+            </Avatar>
             <Input
               min={3}
               max={50}

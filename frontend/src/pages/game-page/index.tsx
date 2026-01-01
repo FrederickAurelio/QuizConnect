@@ -1,23 +1,24 @@
 import type { AnswerLog, LobbyState } from "@/api/sessions";
-import { useLogin } from "@/contexts/login-context";
+import CooldownPage from "@/pages/game-page/components/CooldownPage";
 
-function GamePage({
-  lobby,
-  playersAnswer,
-  myAnswer,
-}: {
+type GamePageProps = {
   lobby: LobbyState;
   playersAnswer: AnswerLog[] | [];
   myAnswer: AnswerLog[] | null | undefined;
-}) {
-  const { user } = useLogin();
-  const isHost = lobby.host._id === user?.userId;
+};
 
-  // TWO PAGE... 
-  // - Leaderboards (cooldown)
-  // - Question & Options (question, result)
+function GamePage({ lobby, playersAnswer, myAnswer }: GamePageProps) {
+  const status = lobby.gameState.status;
 
-  return <div></div>;
+  const PageMap = {
+    cooldown: <CooldownPage lobby={lobby} />,
+    // question: <QuestionPage lobby={lobby} myAnswer={myAnswer} />,
+    // result: <ResultPage lobby={lobby} playersAnswer={playersAnswer} />,
+    // ended: <FinalLeaderboardPage lobby={lobby} />,
+  };
+
+  // Fallback to a loader or empty div if the status doesn't match
+  return PageMap[status as keyof typeof PageMap] || <div />;
 }
 
 export default GamePage;

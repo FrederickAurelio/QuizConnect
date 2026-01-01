@@ -88,8 +88,6 @@ function LobbyPageRouting({ lobby }: { lobby: LobbyState }) {
   }, [gameCode, navigate]);
 
   // LATER HERE NEED TO CHECK THE STATUS FOR ROUTING.....
-
-  console.log(lobbyState)
   if (lobbyState.status === "lobby") return <LobbyPage lobby={lobbyState} />;
   if (lobbyState.status === "started")
     return (
