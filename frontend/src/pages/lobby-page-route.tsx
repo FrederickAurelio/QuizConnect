@@ -7,6 +7,7 @@ import {
 import { useLogin } from "@/contexts/login-context";
 import { handleGeneralError } from "@/lib/axios";
 import { socket } from "@/lib/socket";
+import GamePage from "@/pages/game-page";
 import LoadingPage from "@/pages/loading-page";
 import LobbyPage from "@/pages/lobby-page.tsx";
 import { useQuery } from "@tanstack/react-query";
@@ -88,7 +89,16 @@ function LobbyPageRouting({ lobby }: { lobby: LobbyState }) {
 
   // LATER HERE NEED TO CHECK THE STATUS FOR ROUTING.....
 
-  return <LobbyPage lobby={lobbyState} />;
+  console.log(lobbyState)
+  if (lobbyState.status === "lobby") return <LobbyPage lobby={lobbyState} />;
+  if (lobbyState.status === "started")
+    return (
+      <GamePage
+        playersAnswer={playersAnswer}
+        myAnswer={myAnswer}
+        lobby={lobbyState}
+      />
+    );
 }
 
 function LobbyPageRoute() {

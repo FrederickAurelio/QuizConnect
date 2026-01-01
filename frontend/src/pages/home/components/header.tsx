@@ -2,14 +2,21 @@ import { Button } from "@/components/ui/button";
 import { useLogin } from "@/contexts/login-context";
 import AvatarMenu from "@/pages/home/components/avatar-menu";
 import { Gamepad } from "lucide-react";
-import { useNavigate } from "react-router";
+import { useLocation, useNavigate } from "react-router";
+import { toast } from "sonner";
 
 function Header() {
+  const location = useLocation();
+
   const navigate = useNavigate();
   const { openLogin, isAuthenticated } = useLogin();
 
   const handleClickLogo = () => {
-    navigate("/");
+    if (location.pathname.startsWith("/game")) {
+      toast.error("Please Exit first before going to other page!");
+    } else {
+      navigate("/");
+    }
   };
 
   return (
@@ -28,7 +35,13 @@ function Header() {
           <Button
             className="text-lg"
             onClick={() => {
-              openLogin();
+              if (location.pathname.startsWith("/game")) {
+                toast.error(
+                  "You can only login again when you are not in the game, please leave the lobby/game first!",
+                );
+              } else {
+                openLogin();
+              }
             }}
             size="default"
           >

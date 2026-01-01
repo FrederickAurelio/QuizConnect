@@ -12,6 +12,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ChevronDown, History, LogOut, Pen, ScrollText } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router";
+import { toast } from "sonner";
 
 function AvatarMenu() {
   const navigate = useNavigate();
@@ -43,16 +44,29 @@ function AvatarMenu() {
 
       case "history":
         // Navigate to quiz history page
-        console.log("History clicked");
+        if (location.pathname.startsWith("/game")) {
+          toast.error("Please Exit first before going to other page!");
+        } else {
+          console.log("History clicked");
+        }
         break;
 
       case "quiz":
         // Navigate to user's created quizzes page
-        navigate("/quiz-set");
+        if (location.pathname.startsWith("/game")) {
+          toast.error("Please Exit first before going to other page!");
+        } else {
+          navigate("/quiz-set");
+        }
         break;
 
       case "logout":
-        logoutMutation.mutate();
+        if (location.pathname.startsWith("/game")) {
+          toast.error("You cannot logout when the game is running...");
+        } else {
+          logoutMutation.mutate();
+        }
+
         break;
 
       default:
