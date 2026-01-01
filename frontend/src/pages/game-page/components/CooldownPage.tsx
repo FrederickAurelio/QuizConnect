@@ -6,6 +6,7 @@ function CooldownPage({ lobby }: { lobby: LobbyState }) {
   const duration = useGameCountdown(
     lobby.gameState.startTime,
     lobby.gameState.duration,
+    250,
   );
 
   return (
@@ -27,16 +28,14 @@ function CooldownPage({ lobby }: { lobby: LobbyState }) {
       </div>
 
       <div className="mt-6 flex min-h-0 w-full flex-1 justify-center">
-        <Leaderboard
-          lobby={lobby}
-        />
+        <Leaderboard lobby={lobby} />
       </div>
 
       <div className="my-5 flex flex-col items-center gap-1">
         <span className="text-secondary-foreground/50 text-sm font-semibold">
           NEXT QUESTION IN
         </span>
-        <span className="text-5xl font-bold">{duration}</span>
+        <span className="text-5xl font-bold">{Math.ceil(duration / 4)}</span>
       </div>
     </div>
   );

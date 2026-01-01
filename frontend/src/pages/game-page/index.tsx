@@ -1,5 +1,7 @@
 import type { AnswerLog, LobbyState } from "@/api/sessions";
 import CooldownPage from "@/pages/game-page/components/CooldownPage";
+import QuestionPage from "@/pages/game-page/components/QuestionPage";
+import { useEffect, useState } from "react";
 
 type GamePageProps = {
   lobby: LobbyState;
@@ -8,16 +10,30 @@ type GamePageProps = {
 };
 
 function GamePage({ lobby, playersAnswer, myAnswer }: GamePageProps) {
+  const [localMyAnswer, setLocalMyAnswer] = useState(myAnswer);
+
+  useEffect(() => {
+    setLocalMyAnswer(myAnswer);
+  }, [myAnswer]);
+
   const status = lobby.gameState.status;
+
+  const questionPage = (
+    <QuestionPage
+      lobby={lobby}
+      myAnswer={localMyAnswer}
+      setMyAnswer={setLocalMyAnswer}
+      playersAnswer={playersAnswer}
+    />
+  );
 
   const PageMap = {
     cooldown: <CooldownPage lobby={lobby} />,
-    // question: <QuestionPage lobby={lobby} myAnswer={myAnswer} />,
-    // result: <ResultPage lobby={lobby} playersAnswer={playersAnswer} />,
+    question: questionPage,
+    result: questionPage,
     // ended: <FinalLeaderboardPage lobby={lobby} />,
   };
 
-  // Fallback to a loader or empty div if the status doesn't match
   return PageMap[status as keyof typeof PageMap] || <div />;
 }
 

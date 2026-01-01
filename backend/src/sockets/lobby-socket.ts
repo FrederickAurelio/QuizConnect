@@ -3,6 +3,7 @@ import Quiz from "../models/Quiz.js";
 import { EXPIRY_SECONDS, redis } from "../redis/index.js";
 import {
   addPlayer,
+  AnswerLog,
   deleteLobbySession,
   getAllPlayers,
   getFullLobby,
@@ -294,17 +295,25 @@ export const setupLobbySocket = (io: Server, socket: Socket) => {
       const scoreKey = `game:answer:score:${gameCode}`;
       const correctKey = `game:answer:correct:${gameCode}`;
 
-      const isFirstTime = await redis.hSetNX(
-        questionKey,
-        user._id,
-        JSON.stringify({ optionIndex, key, score: 0 }) // Placeholder
-      );
+      const raw = await redis.hGet(questionKey, user._id);
+      if (!raw) {
+        return socket.emit("error", {
+          message: "Answer state not initialized",
+        });
+      }
 
-      if (!isFirstTime) {
+      const data: AnswerLog = JSON.parse(raw);
+      if (data.key) {
         return socket.emit("error", {
           message: "You already answered this question!",
         });
       }
+
+      const updated: AnswerLog = {
+        optionIndex,
+        key,
+        score: 0,
+      };
 
       if (curQuestion.correctKey === key) {
         const remaining = await redis.decr(correctKey);
@@ -321,6 +330,8 @@ export const setupLobbySocket = (io: Server, socket: Socket) => {
         );
 
         await redis.hIncrBy(scoreKey, user._id, scoreYouGet);
+      } else {
+        await redis.hSet(questionKey, user._id, JSON.stringify(updated));
       }
 
       const rawAnswers = await redis.hGetAll(questionKey);

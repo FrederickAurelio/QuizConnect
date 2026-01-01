@@ -1,14 +1,18 @@
 import { useEffect, useState } from "react";
 
-export function useGameCountdown(startTime: string, durationMs: number) {
+export function useGameCountdown(
+  startTime: string,
+  durationMs: number,
+  perload: number = 1000,
+) {
   const [remaining, setRemaining] = useState(0);
 
   useEffect(() => {
     const calculate = () => {
       const start = new Date(startTime).getTime();
       const now = Date.now();
-      const passed = Math.floor((now - start) / 1000);
-      const total = Math.floor(durationMs / 1000);
+      const passed = Math.floor((now - start) / perload);
+      const total = Math.floor(durationMs / perload);
       return Math.max(0, total - passed);
     };
 
@@ -23,7 +27,7 @@ export function useGameCountdown(startTime: string, durationMs: number) {
         }
         return real;
       });
-    }, 1000);
+    }, perload);
 
     return () => clearInterval(timer);
   }, [startTime, durationMs]);
