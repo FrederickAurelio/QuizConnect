@@ -20,6 +20,7 @@ import { socket } from "@/lib/socket";
 import { DialogClose, DialogDescription } from "@radix-ui/react-dialog";
 import clsx from "clsx";
 import { AlertTriangle, Minus, Plus, SlidersHorizontal } from "lucide-react";
+import { useState } from "react";
 
 type GameSettingsProps = {
   isHost: boolean;
@@ -50,6 +51,8 @@ function GameSettings({
   settings,
   updateSetting,
 }: GameSettingsProps) {
+  const [openModal, setOpenModal] = useState<boolean>(false);
+
   function handleTerminateGame() {
     socket.emit("close-lobby");
   }
@@ -70,44 +73,43 @@ function GameSettings({
           <SlidersHorizontal size={20} />
           <h1 className="text-lg font-medium">Game Settings</h1>
         </div>
-        <Dialog>
-          <DialogTrigger>
-            <Button
-              disabled={!isHost}
-              className="text-primary-foreground font-semibold"
-              variant="destructive"
-              size="sm"
-            >
-              Close Lobby
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-[425px]">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <AlertTriangle className="text-destructive" size={20} />
-                End Game Session?
-              </DialogTitle>
-              <DialogDescription className="py-3">
-                This will immediately disconnect all players and close the
-                lobby. You won't be able to resume this session once it's
-                closed.
-              </DialogDescription>
-            </DialogHeader>
-
-            <DialogFooter className="gap-2">
-              <DialogClose asChild>
-                <Button variant="outline" type="button">
-                  Keep Playing
-                </Button>
-              </DialogClose>
-
-              <Button variant="destructive" onClick={handleTerminateGame}>
-                Yes, End Session
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+        <Button
+          onClick={() => setOpenModal(true)}
+          disabled={!isHost}
+          className="text-primary-foreground font-semibold"
+          variant="destructive"
+          size="sm"
+        >
+          Close Lobby
+        </Button>
       </div>
+
+      <Dialog open={openModal} onOpenChange={setOpenModal}>
+        <DialogContent className="max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="text-destructive" size={20} />
+              End Game Session?
+            </DialogTitle>
+            <DialogDescription className="py-3">
+              This will immediately disconnect all players and close the lobby.
+              You won't be able to resume this session once it's closed.
+            </DialogDescription>
+          </DialogHeader>
+
+          <DialogFooter className="gap-2">
+            <DialogClose asChild>
+              <Button variant="outline" type="button">
+                Keep Playing
+              </Button>
+            </DialogClose>
+
+            <Button variant="destructive" onClick={handleTerminateGame}>
+              Yes, End Session
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <div className="scroll-primary flex flex-col gap-6 overflow-y-auto px-2">
         {/* GROUP 1: Capacity & Content */}
