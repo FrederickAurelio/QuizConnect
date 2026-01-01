@@ -8,6 +8,8 @@ export const setupSocket = (httpServer: HttpServer) => {
       origin: "http://localhost:3221",
       credentials: true,
     },
+    // Ensure the server is listening for the path Vite is proxying
+    path: "/socket.io",
   });
 
   io.on("connection", (socket) => {
