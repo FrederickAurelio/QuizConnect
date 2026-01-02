@@ -102,12 +102,20 @@ function QuestionPage({
   function onAnswerSubmit(optionIndex: number, key: "A" | "B" | "C" | "D") {
     if (isHost) return;
 
-    setMyAnswer((prev) =>
-      prev?.map((answer, i) =>
-        i === questionIndex ? { ...answer, key, optionIndex } : answer,
-      ),
+    socket.emit(
+      "submit-answer",
+      { optionIndex, key },
+      (res: { ok: boolean; nessage: string }) => {
+        const { ok } = res;
+        if (ok) {
+          setMyAnswer((prev) =>
+            prev?.map((answer, i) =>
+              i === questionIndex ? { ...answer, key, optionIndex } : answer,
+            ),
+          );
+        }
+      },
     );
-    socket.emit("submit-answer", { optionIndex, key });
   }
   const resultTheme = !isAnswered
     ? {

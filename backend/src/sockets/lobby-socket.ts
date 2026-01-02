@@ -266,13 +266,16 @@ export const setupLobbySocket = (io: Server, socket: Socket) => {
 
   socket.on(
     "submit-answer",
-    async ({
-      optionIndex,
-      key,
-    }: {
-      optionIndex: number;
-      key: "A" | "B" | "C" | "D";
-    }) => {
+    async (
+      {
+        optionIndex,
+        key,
+      }: {
+        optionIndex: number;
+        key: "A" | "B" | "C" | "D";
+      },
+      ack: (res: { ok: boolean; message?: string }) => void
+    ) => {
       const gameCode = socket.data.gameCode;
       if (!gameCode) return socket.emit("error", { message: "Not in a lobby" });
 
@@ -282,11 +285,15 @@ export const setupLobbySocket = (io: Server, socket: Socket) => {
         getHostData(gameCode),
       ]);
 
-      if (!lobby || !questions || !hostUser)
+      if (!lobby || !questions || !hostUser) {
+        ack?.({ ok: false });
         return socket.emit("error", { message: "Not in a lobby" });
+      }
 
-      if (lobby.gameState.status !== "question")
+      if (lobby.gameState.status !== "question") {
+        ack?.({ ok: false });
         return socket.emit("error", { message: "Time is up!" });
+      }
 
       const qIndex = lobby.gameState.questionIndex;
       const curQuestion = questions[qIndex] as Question;
@@ -297,6 +304,7 @@ export const setupLobbySocket = (io: Server, socket: Socket) => {
 
       const raw = await redis.hGet(questionKey, user._id);
       if (!raw) {
+        ack?.({ ok: false });
         return socket.emit("error", {
           message: "Answer state not initialized",
         });
@@ -304,6 +312,7 @@ export const setupLobbySocket = (io: Server, socket: Socket) => {
 
       const data: AnswerLog = JSON.parse(raw);
       if (data.key) {
+        ack?.({ ok: false });
         return socket.emit("error", {
           message: "You already answered this question!",
         });
@@ -337,6 +346,7 @@ export const setupLobbySocket = (io: Server, socket: Socket) => {
       const rawAnswers = await redis.hGetAll(questionKey);
       const playersAnswer = parseRedisHash(rawAnswers);
       io.to(`user:${hostUser?._id}`).emit("question-dashboard", playersAnswer);
+      ack?.({ ok: true });
     }
   );
 
