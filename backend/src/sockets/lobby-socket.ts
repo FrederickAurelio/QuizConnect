@@ -122,6 +122,10 @@ export const handleGameFlow = async (
 
     if (lobby.status !== "ended") {
       handleGameFlow(io, gameCode, lobby.gameState.duration);
+    } else {
+      // ENDED HANDLE
+
+      await deleteLobbySession(gameCode, hostUser._id, lobby.quiz._id);
     }
   }, duration);
 };
@@ -402,7 +406,7 @@ export const setupLobbySocket = (io: Server, socket: Socket) => {
     if (hostUser._id !== user._id)
       return socket.emit("error", { message: "Only host can start game" });
 
-    const quiz = await Quiz.findById(lobby.quiz._id);
+    const quiz = await Quiz.findById(lobby.quiz._id).lean();
     if (!quiz) {
       return socket.emit("error", { message: "Quiz not found" });
     }
@@ -419,10 +423,13 @@ export const setupLobbySocket = (io: Server, socket: Socket) => {
     );
 
     if (lobby.settings.shuffleAnswers) {
-      processedQuestions = processedQuestions.map((q) => ({
-        ...q,
-        options: shuffleArray([...q.options]),
-      }));
+      processedQuestions = processedQuestions.map((q) => {
+        const shuffledOptions = shuffleArray([...q.options]);
+        return {
+          ...q,
+          options: shuffledOptions,
+        };
+      });
     }
 
     lobby.status = "started";

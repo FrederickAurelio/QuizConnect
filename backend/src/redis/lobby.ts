@@ -98,6 +98,8 @@ export const getFullLobby = async (
     getAllPlayers(gameCode),
   ]);
 
+  if (!lobbyRes || !hostData || !allPlayers) return null;
+
   const lobby: FullLobbyState = {
     ...(lobbyRes as LobbyState),
     players: allPlayers,
@@ -219,9 +221,22 @@ export const deleteLobbySession = async (
 
   try {
     await redis.del(`activeHostLobby:${userId}:${quizId}`);
-    await redis.del(`game:${gameCode}`);
-    await redis.del(`game:players:${gameCode}`);
-    await redis.del(`game:host:${gameCode}`);
+
+    let cursor = "0";
+    const pattern = `*${gameCode}*`;
+
+    do {
+      const { cursor: nextCursor, keys } = await redis.scan(cursor, {
+        MATCH: pattern,
+        COUNT: 100,
+      });
+
+      cursor = nextCursor;
+
+      if (keys.length > 0) {
+        await redis.del(keys as unknown as string[]);
+      }
+    } while (cursor !== "0");
   } catch (error) {
     console.error("Redis Cleanup Error:", error);
     throw error;
