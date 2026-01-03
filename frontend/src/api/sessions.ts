@@ -52,7 +52,7 @@ export type LobbyState = {
     status: "question" | "result" | "cooldown";
     questionIndex: number;
   };
-  createdAt: string;
+  sessionCreatedAt: string;
 };
 
 export const hostQuiz = async (quizId: string) => {

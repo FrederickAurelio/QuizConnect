@@ -60,7 +60,7 @@ export type FullLobbyState = {
     status: "question" | "result" | "cooldown";
     questionIndex: number;
   };
-  createdAt: string;
+  sessionCreatedAt: string;
 };
 
 export type LobbyState = {
@@ -79,7 +79,7 @@ export type LobbyState = {
     status: "question" | "result" | "cooldown";
     questionIndex: number;
   };
-  createdAt: string;
+  sessionCreatedAt: string;
 };
 
 export const getLobby = async (

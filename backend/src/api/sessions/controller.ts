@@ -117,7 +117,7 @@ export const hostQuiz = async (req: Request, res: Response) => {
       banned: [],
       status: "lobby",
       gameState: {},
-      createdAt: new Date().toISOString(),
+      sessionCreatedAt: new Date().toISOString(),
     };
 
     const transaction = redis
