@@ -14,7 +14,7 @@ const optionSchema = new mongoose.Schema(
   { _id: false }
 );
 
-const questionSchema = new mongoose.Schema(
+export const questionSchema = new mongoose.Schema(
   {
     id: { type: String, required: true },
     question: { type: String, trim: true },
