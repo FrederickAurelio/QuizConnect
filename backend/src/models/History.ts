@@ -125,6 +125,10 @@ const historyPlayerResultSchema = new mongoose.Schema({
     default: [],
   },
 });
+historyPlayerResultSchema.index({
+  gameId: 1,
+  "player.userId": 1,
+});
 
 export const HistoryQuery = mongoose.model("HistoryQuery", historyQuerySchema);
 export const HistoryDetail = mongoose.model(

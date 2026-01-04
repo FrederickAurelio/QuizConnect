@@ -13,6 +13,7 @@ import http from "http";
 import sessionRouter from "./api/sessions/router.js";
 import { setupSocket } from "./sockets/index.js";
 import { setupLobbySocket } from "./sockets/lobby-socket.js";
+import historyRouter from "./api/history/router.js";
 
 dotenv.config();
 
@@ -95,6 +96,7 @@ io.use((socket, next) => {
 app.use("/auth", authRoute);
 app.use("/quiz", quizRouter);
 app.use("/sessions", sessionRouter);
+app.use("/history", historyRouter);
 
 // Middleware to refresh session expiration
 app.use((req: Request, res: Response, next: NextFunction) => {
