@@ -19,6 +19,11 @@ import {
   UserInfo,
 } from "../redis/lobby.js";
 import { shuffleArray } from "../utils/tools.js";
+import {
+  HistoryDetail,
+  HistoryPlayerResult,
+  HistoryQuery,
+} from "../models/History.js";
 
 type ParsedAnswer = {
   _id: string;
@@ -118,15 +123,110 @@ export const handleGameFlow = async (
       io.to(`user:${hostUser?._id}`).emit("question-dashboard", playersAnswer);
     }
 
-    io.to(gameCode).emit("lobby-updated", emitLobby);
-
     if (lobby.status !== "ended") {
       handleGameFlow(io, gameCode, lobby.gameState.duration);
     } else {
-      // ENDED HANDLE
+      // -------------- LAYER 1 --------------
+      const winnerUser = (emitLobby?.players ?? []).reduce((best, p) => {
+        return p.totalScore > best.totalScore ? p : best;
+      });
+      const layer1 = new HistoryQuery({
+        gameCode: emitLobby?.gameCode,
+        quiz: {
+          title: emitLobby?.quiz.title ?? "",
+          description: emitLobby?.quiz.description ?? "",
+          questionCount: emitLobby?.quiz.questionCount ?? 0,
+        },
+        host: emitLobby?.host._id ?? "",
+        players: (emitLobby?.players ?? [])
+          .map((player) => player._id)
+          .filter((p) => !p.startsWith("guest_")),
+        playerCount: (emitLobby?.players ?? []).length ?? 0,
+        winner: {
+          userId: winnerUser._id.startsWith("guest_") ? null : winnerUser._id,
+          guestId: winnerUser._id.startsWith("guest_") ? winnerUser._id : null,
+          username: winnerUser?.username ?? "",
+          avatar: winnerUser?.avatar ?? "",
+          totalScore: winnerUser?.totalScore ?? 0,
+        },
+        sessionCreatedAt:
+          emitLobby?.sessionCreatedAt ?? new Date().toISOString(),
+      });
+
+      const allPlayersSnapshot =
+        emitLobby?.players
+          .map((p) => ({
+            userId: p._id.startsWith("guest_") ? null : p._id,
+            guestId: p._id.startsWith("guest_") ? p._id : null,
+            username: p?.username ?? "",
+            avatar: p?.avatar ?? "",
+            totalScore: p?.totalScore ?? 0,
+          }))
+          .sort((a, b) => (b.totalScore ?? 0) - (a.totalScore ?? 0)) ?? [];
+
+      // -------------- LAYER 2 --------------
+      const layer2 = new HistoryDetail({
+        _id: layer1._id,
+        gameCode: emitLobby?.gameCode,
+        quiz: {
+          title: emitLobby?.quiz.title ?? "",
+          description: emitLobby?.quiz.description ?? "",
+          questions: questions,
+        },
+        host: emitLobby?.host._id ?? "",
+        players: allPlayersSnapshot,
+        settings: emitLobby?.settings,
+        sessionCreatedAt:
+          emitLobby?.sessionCreatedAt ?? new Date().toISOString(),
+      });
+
+      // -------------- LAYER 3 --------------
+
+      const questionCount = emitLobby?.settings.questionCount ?? 0;
+
+      const playerResults = await Promise.all(
+        allPlayersSnapshot.map(async (p, rankIdx) => {
+          const multi = redis.multi();
+          const playerKey = (p.userId || p.guestId) as string;
+
+          for (let i = 0; i < questionCount; i++) {
+            multi.hGet(`game:answer:answers:${gameCode}:${i}`, playerKey);
+          }
+
+          const results = await multi.exec();
+
+          const answers: (AnswerLog & { questionIndex: number })[] =
+            results.map((r, qIdx) => {
+              if (typeof r === "string") {
+                try {
+                  return { ...JSON.parse(r), questionIndex: qIdx };
+                } catch {}
+              }
+              return {
+                optionIndex: null,
+                key: null,
+                score: 0,
+                questionIndex: qIdx,
+              };
+            });
+
+          return {
+            gameId: layer1._id,
+            player: p,
+            totalScore: p.totalScore,
+            rank: rankIdx + 1,
+            answers,
+          };
+        })
+      );
+      await layer1.save();
+      await layer2.save();
+      await HistoryPlayerResult.insertMany(playerResults);
 
       await deleteLobbySession(gameCode, hostUser._id, lobby.quiz._id);
     }
+
+    io.to(gameCode).emit("lobby-updated", emitLobby);
   }, duration);
 };
 

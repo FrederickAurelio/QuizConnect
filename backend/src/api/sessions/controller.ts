@@ -283,9 +283,7 @@ export const getYourAnswer = async (req: Request, res: Response) => {
       if (typeof r === "string") {
         try {
           return JSON.parse(r);
-        } catch (e) {
-          return { optionIndex: null, key: null };
-        }
+        } catch {}
       }
       return { optionIndex: null, key: null };
     });
