@@ -20,8 +20,10 @@ import { DialogClose, DialogDescription } from "@radix-ui/react-dialog";
 import clsx from "clsx";
 import { AlertTriangle, Minus, Plus, SlidersHorizontal } from "lucide-react";
 import { useState } from "react";
+import { toast } from "sonner";
 
 type GameSettingsProps = {
+  playerCount: number;
   isHost: boolean;
   totalAvailableQuestions: number;
   settings: {
@@ -45,6 +47,7 @@ type GameSettingsProps = {
 };
 
 function GameSettings({
+  playerCount,
   isHost,
   totalAvailableQuestions,
   settings,
@@ -57,6 +60,8 @@ function GameSettings({
   }
 
   function handleStartGame() {
+    if (playerCount < 1)
+      return toast.error("Need at least 1 player to start the game");
     socket.emit("start-game");
   }
 

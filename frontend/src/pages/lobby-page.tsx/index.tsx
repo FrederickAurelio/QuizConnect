@@ -47,13 +47,14 @@ function LobbyPage({ lobby }: { lobby: LobbyState }) {
   return (
     <div className="grid h-full w-full grid-cols-3">
       {/* LEFT */}
-      <div className="col-span-2 flex flex-col gap-3 p-6 h-full overflow-hidden">
+      <div className="col-span-2 flex h-full flex-col gap-3 overflow-hidden p-6">
         <LobbyPageHeader gameCode={gameCode} quizMetadata={quizMetadata} />
         <JoinedCard host={host} players={players} />
       </div>
 
       {/* RIGHT */}
       <GameSettings
+        playerCount={lobby.players.length}
         isHost={isHost}
         totalAvailableQuestions={totalAvailableQuestions}
         settings={isHost ? settingsDraft : serverSettings}
