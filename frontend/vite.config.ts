@@ -8,14 +8,12 @@ export default defineConfig({
   server: {
     proxy: {
       "/api": {
-        target: "http://192.168.1.102:2000",
-        // target: "http://localhost:2000",
+        target: "http://localhost:2000",
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, ""), // removes /api prefix
       },
       "/socket.io": {
-        target: "http://192.168.1.102:2000",
-        // target: "http://localhost:2000",
+        target: "http://localhost:2000",
         ws: true, // <--- important for socket.io
       },
     },

@@ -22,7 +22,7 @@ mongoose
   .then(() => console.log("Connected to Database"))
   .catch((err) => console.error(err));
 
-const PORT = process.env.PORT || 2000;
+const PORT = Number(process.env.PORT) || 2000;
 const app = express();
 
 const server = http.createServer(app);
