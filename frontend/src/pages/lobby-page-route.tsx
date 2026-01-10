@@ -15,12 +15,12 @@ import { useEffect, useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router";
 import { toast } from "sonner";
 
-function LobbyPageRouting({ lobby }: { lobby: LobbyState }) {
+function LobbyPageRouting({ lobby: lobbyProps }: { lobby: LobbyState }) {
   const { user } = useLogin();
   const navigate = useNavigate();
-  const { gameCode } = lobby;
+  const { gameCode } = lobbyProps;
 
-  const [lobbyState, setLobbyState] = useState<LobbyState>(lobby);
+  const [lobbyState, setLobbyState] = useState<LobbyState>(lobbyProps);
   const [playersAnswer, setPlayerAnswer] = useState<AnswerLog[]>([]);
 
   const answerFetchenabled =
@@ -38,11 +38,8 @@ function LobbyPageRouting({ lobby }: { lobby: LobbyState }) {
     refetchOnMount: "always",
     refetchOnWindowFocus: false,
   });
-  // THIS LATER NEED TO GIVE FOR THE USER IN THEIR QUESTION JAWAB PAGE (PLAYER)
-  const myAnswer = myAnswerRes?.data;
 
-  // THIS LATER NEED TO GIVE TO THE HOST in THEIR DASHBOARD (HOST)
-  // const [playersAnswer, setPlayerAnswer]
+  const myAnswer = myAnswerRes?.data;
 
   useEffect(() => {
     socket.connect();
@@ -87,7 +84,6 @@ function LobbyPageRouting({ lobby }: { lobby: LobbyState }) {
     };
   }, [gameCode, navigate]);
 
-  // LATER HERE NEED TO CHECK THE STATUS FOR ROUTING.....
   if (lobbyState.status === "lobby") return <LobbyPage lobby={lobbyState} />;
   if (lobbyState.status === "started")
     return (
@@ -97,6 +93,10 @@ function LobbyPageRouting({ lobby }: { lobby: LobbyState }) {
         lobby={lobbyState}
       />
     );
+  if (lobbyState.status === "ended" && lobbyState.gameId) {
+    toast.success(`That's all for the game, thank you for playing..`);
+    return <Navigate to={`/history/${lobbyState.gameId}`} replace />;
+  }
 }
 
 function LobbyPageRoute() {

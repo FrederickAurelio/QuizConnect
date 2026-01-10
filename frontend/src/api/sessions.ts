@@ -53,6 +53,9 @@ export type LobbyState = {
     questionIndex: number;
   };
   sessionCreatedAt: string;
+
+  // will be available if the game was ended and data saved...
+  gameId?: string;
 };
 
 export const hostQuiz = async (quizId: string) => {

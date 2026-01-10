@@ -31,7 +31,6 @@ function GamePage({ lobby, playersAnswer, myAnswer }: GamePageProps) {
     cooldown: <CooldownPage lobby={lobby} />,
     question: questionPage,
     result: questionPage,
-    // ended: <FinalLeaderboardPage lobby={lobby} />,
   };
 
   return PageMap[status as keyof typeof PageMap] || <div />;

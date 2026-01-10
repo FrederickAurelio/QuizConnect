@@ -219,13 +219,14 @@ export const handleGameFlow = async (
           };
         })
       );
-      
+
       await Promise.all([
         layer1.save(),
         layer2.save(),
         HistoryPlayerResult.insertMany(playerResults),
       ]);
 
+      if (emitLobby) emitLobby.gameId = String(layer1._id);
       await deleteLobbySession(gameCode, hostUser._id, lobby.quiz._id);
     }
 

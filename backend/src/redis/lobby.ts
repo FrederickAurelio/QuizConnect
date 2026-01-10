@@ -61,6 +61,9 @@ export type FullLobbyState = {
     questionIndex: number;
   };
   sessionCreatedAt: string;
+
+  // will be available if the game was ended and data saved...
+  gameId?: string;
 };
 
 export type LobbyState = {
