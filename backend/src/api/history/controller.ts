@@ -51,6 +51,29 @@ export const getHistories = async (req: Request, res: Response) => {
       {
         $lookup: {
           from: User.collection.name, // "users"
+          localField: "host",
+          foreignField: "_id",
+          as: "hostUser",
+        },
+      },
+      {
+        $addFields: {
+          host: {
+            $cond: [
+              { $gt: [{ $size: "$hostUser" }, 0] },
+              {
+                _id: { $arrayElemAt: ["$hostUser._id", 0] },
+                username: { $arrayElemAt: ["$hostUser.username", 0] },
+                avatar: { $arrayElemAt: ["$hostUser.avatar", 0] },
+              },
+              "$host",
+            ],
+          },
+        },
+      },
+      {
+        $lookup: {
+          from: User.collection.name, // "users"
           localField: "winner.userId",
           foreignField: "_id",
           as: "winnerUser",
@@ -112,7 +135,6 @@ export const getHistories = async (req: Request, res: Response) => {
 
       {
         $project: {
-          winnerUser: 0,
           gameCode: 1,
           quiz: 1,
           playerCount: 1,
@@ -120,6 +142,7 @@ export const getHistories = async (req: Request, res: Response) => {
           myResult: 1,
           sessionCreatedAt: 1,
           createdAt: 1,
+          host: 1,
         },
       },
     ]);
@@ -139,6 +162,18 @@ export const getHistories = async (req: Request, res: Response) => {
     return handleControllerError(res, error);
   }
 };
+
+function buildPlayerQuery(userId: string) {
+  if (userId.startsWith("guest_")) {
+    return { "player.guestId": userId };
+  }
+  return {
+    $or: [
+      { "player.userId": new Types.ObjectId(userId) },
+      { "player.guestId": userId },
+    ],
+  };
+}
 
 // ---------------- GET HISTORY DETAIL ----------------
 export const getHistoryDetail = async (req: Request, res: Response) => {
@@ -299,7 +334,17 @@ export const getHistoryDetail = async (req: Request, res: Response) => {
         {
           $group: {
             _id: "$answers.questionIndex",
-            answers: { $push: "$answers" },
+            answers: {
+              $push: {
+                optionIndex: "$answers.optionIndex",
+                key: "$answers.key",
+                questionIndex: "$answers.questionIndex",
+                score: "$answers.score",
+                _id: {
+                  $ifNull: ["$player.userId", "$player.guestId"],
+                },
+              },
+            },
           },
         },
         { $sort: { _id: 1 } },
@@ -318,15 +363,12 @@ export const getHistoryDetail = async (req: Request, res: Response) => {
     } else {
       const myPlayer = await HistoryPlayerResult.findOne({
         gameId: historyData._id,
-        "player.userId": userId,
+        ...buildPlayerQuery(userId as any),
       })
         .select({
           _id: 0,
-          gameId: 0,
           player: 1,
           answers: 1,
-          totalScore: 0,
-          rank: 0,
         })
         .lean();
 

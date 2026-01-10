@@ -15,6 +15,8 @@ import "./index.css";
 import EditPage from "@/pages/edit-page";
 import LobbyPageRoute from "@/pages/lobby-page-route";
 import EditProfileProvider from "@/contexts/edit-profile-context";
+import HistoryList from "@/pages/history/HistoryList";
+import HistoryDetail from "@/pages/history/HistoryDetail";
 
 // -------------------- Private Route --------------------
 function PrivateRoute({ children }: { children: React.ReactNode }) {
@@ -76,6 +78,14 @@ function AppRouter() {
         {
           path: "/game/:gameCode",
           element: <LobbyPageRoute />,
+        },
+        {
+          path: "/history",
+          element: <HistoryList />,
+        },
+        {
+          path: "/history/:gameId",
+          element: <HistoryDetail />,
         },
         {
           path: "*",

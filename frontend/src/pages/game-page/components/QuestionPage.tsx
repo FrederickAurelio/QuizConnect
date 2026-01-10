@@ -44,15 +44,147 @@ function TimeHeader({
   );
 }
 
+type QuestionContentProp = {
+  questionIndex: number;
+  curQuestion: LobbyState["quiz"]["curQuestion"];
+  isAnswered: "A" | "B" | "C" | "D" | null | undefined;
+  isResult: boolean;
+  isHost: boolean;
+  groupedAnswers: GroupedAnswers;
+  onAnswerSubmit?: (optionIndex: number, key: "A" | "B" | "C" | "D") => void;
+};
+
+export function QuestionContent({
+  questionIndex,
+  curQuestion,
+  isAnswered,
+  isResult,
+  isHost,
+  groupedAnswers,
+  onAnswerSubmit,
+}: QuestionContentProp) {
+  const resultAnswer = isResult ? curQuestion?.correctKey : null;
+  const isCorrect = resultAnswer === isAnswered;
+
+  return (
+    <>
+      <div className="flex flex-col items-center gap-4 text-center">
+        <span className="bg-primary/10 text-primary rounded-full px-4 py-1 text-xs font-black uppercase">
+          Question {questionIndex + 1}
+        </span>
+        <h1 className="balance text-3xl font-extrabold md:text-4xl">
+          {curQuestion?.question ?? ""}
+        </h1>
+      </div>
+      <div className="grid w-full grid-cols-1 gap-4 md:grid-cols-2">
+        {curQuestion?.options.map((option, index) => {
+          const selected = isAnswered === option.key;
+
+          const buttonClass = clsx(
+            "flex flex-col justify-center min-h-[100px] rounded-2xl border-2 p-6 transition-all active:scale-[0.98]",
+            isAnswered || isResult
+              ? selected && !isResult
+                ? "border-primary bg-primary/10"
+                : selected && !isCorrect
+                  ? "border-destructive/50 bg-destructive/10"
+                  : (selected && isCorrect) || option.key === resultAnswer
+                    ? "border-emerald-500/50 bg-emerald-500/10"
+                    : "border-border bg-card opacity-50 grayscale-[0.5]"
+              : "bg-primary/10 hover:border-primary/50 hover:bg-secondary/50",
+          );
+
+          return (
+            <button
+              key={index}
+              onClick={() => onAnswerSubmit?.(index, option.key)}
+              disabled={!!isAnswered || !!isResult}
+              className={buttonClass}
+            >
+              <div className="flex w-full items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="bg-secondary flex size-10 items-center justify-center rounded-lg font-black">
+                    {String.fromCharCode(65 + index)}
+                  </div>
+                  <span className="text-lg font-bold">{option.text}</span>
+                </div>
+
+                {selected && !isResult && (
+                  <div className="bg-primary animate-in zoom-in flex size-6 items-center justify-center rounded-full">
+                    <Check strokeWidth={3} className="size-4 text-black" />
+                  </div>
+                )}
+
+                {isResult && selected && !isCorrect && (
+                  <div className="bg-destructive/50 animate-in zoom-in flex size-6 items-center justify-center rounded-full">
+                    <XCircle strokeWidth={3} className="size-4 text-black" />
+                  </div>
+                )}
+
+                {isResult && selected && isCorrect && (
+                  <div className="animate-in zoom-in flex size-6 items-center justify-center rounded-full bg-emerald-500/50">
+                    <CheckCircle2
+                      strokeWidth={3}
+                      className="size-4 text-black"
+                    />
+                  </div>
+                )}
+              </div>
+              {isHost && (
+                <div className="flex-1">
+                  <div className="bg-border my-3 h-px w-full"></div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {groupedAnswers[option.key].map((p) => (
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Avatar className="size-10 cursor-pointer p-2">
+                              <AvatarImage src={p?.avatar ?? ""} />
+                              <AvatarFallback>
+                                {(p?.username ?? "")
+                                  .split(" ")
+                                  .map((word) => word[0]?.toUpperCase())
+                                  .slice(0, 2)
+                                  .join("")}
+                              </AvatarFallback>
+                            </Avatar>
+                          </TooltipTrigger>
+
+                          <TooltipContent
+                            removeArrow
+                            className="bg-secondary-foreground"
+                            sideOffset={5}
+                            side="top"
+                          >
+                            <p className="text-xs font-semibold">
+                              {p?.username}
+                            </p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </button>
+          );
+        })}
+      </div>
+    </>
+  );
+}
+
 type QuestionPageProps = {
-  lobby: LobbyState;
+  gameState: LobbyState["gameState"];
+  host: LobbyState["host"];
+  curQuestion: LobbyState["quiz"]["curQuestion"];
+  players: LobbyState["players"];
   myAnswer: AnswerLog[] | null | undefined;
   setMyAnswer: Dispatch<SetStateAction<AnswerLog[] | null | undefined>>;
   playersAnswer: AnswerLog[];
 };
 
 type AddonAnswerLog = AnswerLog & { username: string; avatar: string };
-type GroupedAnswers = {
+export type GroupedAnswers = {
   A: AddonAnswerLog[];
   B: AddonAnswerLog[];
   C: AddonAnswerLog[];
@@ -60,26 +192,29 @@ type GroupedAnswers = {
 };
 
 function QuestionPage({
-  lobby,
+  gameState,
+  host,
+  curQuestion,
+  players,
   myAnswer,
   setMyAnswer,
   playersAnswer,
 }: QuestionPageProps) {
   const { user } = useLogin();
-  const isHost = user?.userId === lobby.host._id;
+  const isHost = user?.userId === host._id;
 
-  const questionIndex = lobby.gameState.questionIndex;
+  const questionIndex = gameState.questionIndex;
   const answerForThisQuestion = (myAnswer ?? []).at(questionIndex);
 
-  const isResult = lobby.gameState.status === "result";
-  const resultAnswer = isResult ? lobby.quiz.curQuestion?.correctKey : null;
+  const isResult = gameState.status === "result";
+  const resultAnswer = isResult ? curQuestion?.correctKey : null;
 
   const isAnswered = answerForThisQuestion?.key;
   const isCorrect = resultAnswer === isAnswered;
 
   const playerMap = useMemo(() => {
-    return Object.fromEntries(lobby.players.map((p) => [p._id, p]));
-  }, [lobby.players]);
+    return Object.fromEntries(players.map((p) => [p._id, p]));
+  }, [players]);
   const groupedAnswers = useMemo<GroupedAnswers>(() => {
     const result: GroupedAnswers = { A: [], B: [], C: [], D: [] };
 
@@ -178,113 +313,20 @@ function QuestionPage({
         </div>
       ) : (
         <TimeHeader
-          startTime={lobby.gameState.startTime}
-          lobbyDuration={lobby.gameState.duration}
+          startTime={gameState.startTime}
+          lobbyDuration={gameState.duration}
         />
       )}
 
-      <div className="flex flex-col items-center gap-4 text-center">
-        <span className="bg-primary/10 text-primary rounded-full px-4 py-1 text-xs font-black uppercase">
-          Question {questionIndex + 1}
-        </span>
-        <h1 className="balance text-3xl font-extrabold md:text-4xl">
-          {lobby.quiz?.curQuestion?.question ?? ""}
-        </h1>
-      </div>
-
-      <div className="grid w-full grid-cols-1 gap-4 md:grid-cols-2">
-        {lobby.quiz?.curQuestion?.options.map((option, index) => {
-          const selected = isAnswered === option.key;
-
-          const buttonClass = clsx(
-            "flex flex-col justify-center min-h-[100px] rounded-2xl border-2 p-6 transition-all active:scale-[0.98]",
-            isAnswered || isResult
-              ? selected && !isResult
-                ? "border-primary bg-primary/10"
-                : selected && !isCorrect
-                  ? "border-destructive/50 bg-destructive/10"
-                  : (selected && isCorrect) || option.key === resultAnswer
-                    ? "border-emerald-500/50 bg-emerald-500/10"
-                    : "border-border bg-card opacity-50 grayscale-[0.5]"
-              : "bg-primary/10 hover:border-primary/50 hover:bg-secondary/50",
-          );
-
-          return (
-            <button
-              key={index}
-              onClick={() => onAnswerSubmit(index, option.key)}
-              disabled={!!isAnswered || !!isResult}
-              className={buttonClass}
-            >
-              <div className="flex w-full items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="bg-secondary flex size-10 items-center justify-center rounded-lg font-black">
-                    {String.fromCharCode(65 + index)}
-                  </div>
-                  <span className="text-lg font-bold">{option.text}</span>
-                </div>
-
-                {selected && !isResult && (
-                  <div className="bg-primary animate-in zoom-in flex size-6 items-center justify-center rounded-full">
-                    <Check strokeWidth={3} className="size-4 text-black" />
-                  </div>
-                )}
-
-                {isResult && selected && !isCorrect && (
-                  <div className="bg-destructive/50 animate-in zoom-in flex size-6 items-center justify-center rounded-full">
-                    <XCircle strokeWidth={3} className="size-4 text-black" />
-                  </div>
-                )}
-
-                {isResult && selected && isCorrect && (
-                  <div className="animate-in zoom-in flex size-6 items-center justify-center rounded-full bg-emerald-500/50">
-                    <CheckCircle2
-                      strokeWidth={3}
-                      className="size-4 text-black"
-                    />
-                  </div>
-                )}
-              </div>
-              {isHost && (
-                <div className="flex-1">
-                  <div className="bg-border my-3 h-px w-full"></div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    {groupedAnswers[option.key].map((p) => (
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Avatar className="size-10 cursor-pointer p-2">
-                              <AvatarImage src={p?.avatar ?? ""} />
-                              <AvatarFallback>
-                                {(p?.username ?? "")
-                                  .split(" ")
-                                  .map((word) => word[0]?.toUpperCase())
-                                  .slice(0, 2)
-                                  .join("")}
-                              </AvatarFallback>
-                            </Avatar>
-                          </TooltipTrigger>
-
-                          <TooltipContent
-                            removeArrow
-                            className="bg-secondary-foreground"
-                            sideOffset={5}
-                            side="top"
-                          >
-                            <p className="text-xs font-semibold">
-                              {p?.username}
-                            </p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </button>
-          );
-        })}
-      </div>
+      <QuestionContent
+        questionIndex={questionIndex + 1}
+        curQuestion={curQuestion}
+        isAnswered={isAnswered}
+        isResult={isResult}
+        isHost={isHost}
+        groupedAnswers={groupedAnswers}
+        onAnswerSubmit={onAnswerSubmit}
+      />
     </div>
   );
 }

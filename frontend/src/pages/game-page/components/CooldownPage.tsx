@@ -28,7 +28,7 @@ function CooldownPage({ lobby }: { lobby: LobbyState }) {
       </div>
 
       <div className="mt-6 flex min-h-0 w-full flex-1 justify-center">
-        <Leaderboard lobby={lobby} />
+        <Leaderboard players={lobby.players} />
       </div>
 
       <div className="my-5 flex flex-col items-center gap-1">

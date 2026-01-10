@@ -47,7 +47,7 @@ function AvatarMenu() {
         if (location.pathname.startsWith("/game")) {
           toast.error("Please Exit first before going to other page!");
         } else {
-          console.log("History clicked");
+          navigate("/history");
         }
         break;
 

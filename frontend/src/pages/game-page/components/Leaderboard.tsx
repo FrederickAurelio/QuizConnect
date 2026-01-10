@@ -5,28 +5,28 @@ import clsx from "clsx";
 import { useEffect, useRef } from "react";
 
 type LeaderboardProps = {
-  lobby: LobbyState;
+  players: LobbyState["players"];
 };
 
 const rankStyles = [
   {
-    bg: "bg-yellow-500/10",
+    bg: "bg-yellow-500/10 hover:bg-yellow-500/20",
     border: "border-yellow-500/50",
     text: "text-yellow-600 dark:text-yellow-400",
   },
   {
-    bg: "bg-slate-400/10",
+    bg: "bg-slate-400/10 hover:bg-slate-500/20",
     border: "border-slate-400/50",
     text: "text-slate-500 dark:text-slate-300",
   },
   {
-    bg: "bg-amber-700/10",
+    bg: "bg-amber-700/10 hover:bg-amber-700/20",
     border: "border-amber-700/50",
     text: "text-amber-700 dark:text-amber-500",
   },
 ];
 
-export const Leaderboard = ({ lobby }: LeaderboardProps) => {
+export const Leaderboard = ({ players }: LeaderboardProps) => {
   const { user } = useLogin();
   const currentUserId = user?.userId;
 
@@ -50,7 +50,7 @@ export const Leaderboard = ({ lobby }: LeaderboardProps) => {
       ref={containerRef}
       className="border-border bg-card/50 no-scrollbar flex w-full max-w-[750px] flex-col gap-2 overflow-y-auto rounded-3xl border p-4 shadow-xl backdrop-blur-md"
     >
-      {lobby.players
+      {players
         .slice()
         .sort((a, b) => (b.totalScore ?? 0) - (a.totalScore ?? 0))
         .map((player, i) => {
@@ -62,8 +62,11 @@ export const Leaderboard = ({ lobby }: LeaderboardProps) => {
               key={player._id}
               ref={player._id === currentUserId ? currentUserRef : null}
               className={clsx(
-                "group hover:bg-secondary/50 hover:border-border flex w-full items-center gap-4 rounded-2xl border border-transparent p-3 transition-all",
-                isTop3 && "bg-secondary/30",
+                "group flex w-full items-center gap-4 rounded-2xl border p-3 transition-all",
+                isTop3 && styles.border,
+                isTop3 && styles.bg,
+                !isTop3 &&
+                  "hover:bg-secondary/20 hover:border-border/50 border-transparent",
               )}
             >
               <div className="flex w-10 justify-center">
@@ -79,7 +82,7 @@ export const Leaderboard = ({ lobby }: LeaderboardProps) => {
 
               <Avatar
                 className={clsx(
-                  "size-12 border-2 transition-transform group-hover:scale-105",
+                  "size-12 border-2 p-2 transition-transform group-hover:scale-105",
                   isTop3 ? styles.border : "border-transparent",
                 )}
               >

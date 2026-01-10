@@ -73,8 +73,6 @@ const historyDetailSchema = new mongoose.Schema(
     _id: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "HistoryQuery",
-      unique: true,
-      index: true,
     },
     gameCode: {
       type: String,
@@ -128,6 +126,7 @@ const historyPlayerResultSchema = new mongoose.Schema({
 historyPlayerResultSchema.index({
   gameId: 1,
   "player.userId": 1,
+  "player.guestId": 1,
 });
 
 export const HistoryQuery = mongoose.model("HistoryQuery", historyQuerySchema);

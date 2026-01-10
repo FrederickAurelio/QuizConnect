@@ -25,16 +25,27 @@ function LobbyPageHeader({
   const [copied, setCopied] = useState(false);
   const handleCopyCode = async () => {
     try {
-      await navigator.clipboard.writeText(gameCode);
-      toast.success("Code copied to clipboard!");
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(gameCode);
+      } else {
+        // fallback for insecure context
+        const el = document.createElement("textarea");
+        el.value = gameCode;
+        document.body.appendChild(el);
+        el.select();
+        document.execCommand("copy");
+        document.body.removeChild(el);
+      }
 
+      toast.success("Code copied to clipboard!");
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000); // Reset icon after 2 seconds
+      setTimeout(() => setCopied(false), 2000);
     } catch (err) {
       toast.error("Failed to copy code");
       console.error("Copy failed:", err);
     }
   };
+
   return (
     <div className="bg-card border-border flex w-full shrink-0 items-center gap-4 rounded-xl border px-4 py-3 text-lg font-semibold">
       <button onClick={handleBack} className="hover:text-primary mx-2">

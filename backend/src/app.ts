@@ -12,7 +12,6 @@ import { connectRedis } from "./redis/index.js";
 import http from "http";
 import sessionRouter from "./api/sessions/router.js";
 import { setupSocket } from "./sockets/index.js";
-import { setupLobbySocket } from "./sockets/lobby-socket.js";
 import historyRouter from "./api/history/router.js";
 
 dotenv.config();

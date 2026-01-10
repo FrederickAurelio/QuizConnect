@@ -5,5 +5,5 @@ import { getHistories, getHistoryDetail } from "./controller.js";
 const historyRouter = Router();
 
 historyRouter.get("/", isAuthenticated, getHistories);
-historyRouter.get("/:gameId", isAuthenticated, getHistoryDetail);
+historyRouter.get("/:gameId", getHistoryDetail);
 export default historyRouter;

@@ -135,7 +135,7 @@ export const handleGameFlow = async (
         quiz: {
           title: emitLobby?.quiz.title ?? "",
           description: emitLobby?.quiz.description ?? "",
-          questionCount: emitLobby?.quiz.questionCount ?? 0,
+          questionCount: emitLobby?.settings.questionCount ?? 0,
         },
         host: emitLobby?.host._id ?? "",
         players: (emitLobby?.players ?? [])
@@ -490,12 +490,6 @@ export const setupLobbySocket = (io: Server, socket: Socket) => {
     const gameCode = socket.data.gameCode;
     if (!gameCode) return socket.emit("error", { message: "Not in a lobby" });
 
-    const wasAlreadyStarted = await redis.getSet(
-      `game:started:${gameCode}`,
-      "true"
-    );
-    if (wasAlreadyStarted) return;
-
     const [lobby, hostUser, allPlayers] = await Promise.all([
       getLobby(gameCode),
       getHostData(gameCode),
@@ -510,10 +504,21 @@ export const setupLobbySocket = (io: Server, socket: Socket) => {
     if (hostUser._id !== user._id)
       return socket.emit("error", { message: "Only host can start game" });
 
+    if (allPlayers.length < 1)
+      return socket.emit("error", {
+        message: "Need at least 1 player to start the game",
+      });
+
     const quiz = await Quiz.findById(lobby.quiz._id).lean();
     if (!quiz) {
       return socket.emit("error", { message: "Quiz not found" });
     }
+
+    const wasAlreadyStarted = await redis.getSet(
+      `game:started:${gameCode}`,
+      "true"
+    );
+    if (wasAlreadyStarted) return;
 
     let processedQuestions = [...quiz.questions] as Question[];
 

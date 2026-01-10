@@ -20,7 +20,10 @@ function GamePage({ lobby, playersAnswer, myAnswer }: GamePageProps) {
 
   const questionPage = (
     <QuestionPage
-      lobby={lobby}
+      gameState={lobby?.gameState}
+      host={lobby.host}
+      curQuestion={lobby.quiz.curQuestion}
+      players={lobby.players}
       myAnswer={localMyAnswer}
       setMyAnswer={setLocalMyAnswer}
       playersAnswer={playersAnswer}

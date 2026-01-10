@@ -42,7 +42,7 @@ function QuizSetPage() {
     return () => observer.disconnect();
   }, []);
 
-  const { data, fetchNextPage, hasNextPage, isFetchingNextPage } =
+  const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isFetching } =
     useInfiniteQuery({
       queryKey: ["quizzes", option],
       queryFn: async ({ pageParam = 1 }) =>
@@ -61,8 +61,8 @@ function QuizSetPage() {
   const { ref, inView } = useInView();
 
   useEffect(() => {
-    if (!inView || isFetchingNextPage || !hasNextPage) return;
-    fetchNextPage();
+    if (inView && !isFetchingNextPage && !isFetching && hasNextPage)
+      fetchNextPage();
   }, [inView, isFetchingNextPage, hasNextPage, fetchNextPage]);
 
   return (
@@ -106,12 +106,12 @@ function QuizSetPage() {
             <QuizCard key={quiz?._id} quiz={quiz} />
           ))}
         </div>
-        {(hasNextPage || isFetchingNextPage) && (
+        {(hasNextPage || isFetchingNextPage || isFetching) && (
           <div
             className="text-primary flex h-12 shrink-0 items-center justify-center"
             ref={ref}
           >
-            {isFetchingNextPage && (
+            {(isFetchingNextPage || isFetching) && (
               <Loader2 className="animate-spin" size={26} />
             )}
           </div>
