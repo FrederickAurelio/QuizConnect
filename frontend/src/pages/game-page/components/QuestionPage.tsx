@@ -319,7 +319,7 @@ function QuestionPage({
       )}
 
       <QuestionContent
-        questionIndex={questionIndex + 1}
+        questionIndex={questionIndex}
         curQuestion={curQuestion}
         isAnswered={isAnswered}
         isResult={isResult}
