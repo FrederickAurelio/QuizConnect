@@ -171,7 +171,7 @@ function HistoryDetail() {
       </div>
 
       {history.players && (
-        <div className="mt-6 mb-8 flex h-96 w-full shrink-0 justify-center">
+        <div className="z-20 mt-6 mb-8 flex h-96 w-full shrink-0 justify-center">
           <Leaderboard players={history.players} />
         </div>
       )}
