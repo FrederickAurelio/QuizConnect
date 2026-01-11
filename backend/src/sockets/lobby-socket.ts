@@ -100,7 +100,8 @@ export const handleGameFlow = async (
       lobby.gameState.questionIndex + 1 < questions.length
     ) {
       const correctKey = `game:answer:correct:${gameCode}`;
-      await redis.set(correctKey, allPlayers.length + 1, {
+
+      await redis.set(correctKey, allPlayers.length, {
         EX: EXPIRY_SECONDS,
       });
 
@@ -387,10 +388,11 @@ export const setupLobbySocket = (io: Server, socket: Socket) => {
       const gameCode = socket.data.gameCode;
       if (!gameCode) return socket.emit("error", { message: "Not in a lobby" });
 
-      const [lobby, questions, hostUser] = await Promise.all([
+      const [lobby, questions, hostUser, allPlayers] = await Promise.all([
         getLobby(gameCode),
         getQuestions(gameCode),
         getHostData(gameCode),
+        getAllPlayers(gameCode),
       ]);
 
       if (!lobby || !questions || !hostUser) {
@@ -434,7 +436,8 @@ export const setupLobbySocket = (io: Server, socket: Socket) => {
 
       if (curQuestion.correctKey === key) {
         const remaining = await redis.decr(correctKey);
-        const scoreYouGet = Math.max(remaining, 0);
+        const baseScore = Math.ceil(allPlayers.length / 2);
+        const scoreYouGet = Math.max(remaining + 1, 0) + baseScore;
 
         await redis.hSet(
           questionKey,
@@ -570,7 +573,7 @@ export const setupLobbySocket = (io: Server, socket: Socket) => {
 
     await Promise.all([
       multi.exec(),
-      redis.set(correctKey, allPlayers.length + 1, { EX: EXPIRY_SECONDS }),
+      redis.set(correctKey, allPlayers.length, { EX: EXPIRY_SECONDS }),
       saveQuestions(gameCode, processedQuestions),
       saveLobby(gameCode, lobby),
     ]);
