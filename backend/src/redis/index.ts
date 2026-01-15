@@ -1,5 +1,7 @@
 import { createClient } from "redis";
-import "dotenv/config";
+import dotenv from "dotenv";
+
+dotenv.config({ path: ".env.local" });
 
 export const EXPIRY_SECONDS = 3600 * 3;
 export const redis = createClient({

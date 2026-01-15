@@ -1,5 +1,7 @@
 import { SendSmtpEmail, TransactionalEmailsApi } from "@getbrevo/brevo";
-import 'dotenv/config'
+import dotenv from "dotenv";
+
+dotenv.config({ path: ".env.local" });
 
 // --- TYPE DEFINITIONS ---
 // Define an interface for the parameters needed by our custom send function
@@ -12,7 +14,7 @@ interface SendVerificationEmailOptions {
 // 1. Get API Key and Sender Email from environment variables
 const BREVO_API_KEY = process.env.BREVO_API_KEY;
 
-const SENDER_EMAIL = process.env.SENDER_EMAIL || "frederick.ah88@gmail.com"; // Add this variable
+const SENDER_EMAIL = process.env.SENDER_EMAIL || "";
 
 if (!BREVO_API_KEY) {
   throw new Error("BREVO_API_KEY environment variable is not set.");

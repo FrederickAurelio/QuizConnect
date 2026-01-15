@@ -14,7 +14,7 @@ import sessionRouter from "./api/sessions/router.js";
 import { setupSocket } from "./sockets/index.js";
 import historyRouter from "./api/history/router.js";
 
-dotenv.config();
+dotenv.config({ path: ".env.local" });
 
 // Initial setup and middleware
 mongoose
