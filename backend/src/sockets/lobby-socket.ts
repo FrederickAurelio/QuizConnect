@@ -121,7 +121,10 @@ export const handleGameFlow = async (
       const rawAnswers = await redis.hGetAll(questionKey);
       const playersAnswer = parseRedisHash(rawAnswers);
 
-      io.to(`user:${hostUser?._id}`).emit("question-dashboard", playersAnswer);
+      io.to(`user:${hostUser?._id}:${gameCode}`).emit(
+        "question-dashboard",
+        playersAnswer
+      );
     }
 
     if (lobby.status !== "ended") {
@@ -266,6 +269,7 @@ export const setupLobbySocket = (io: Server, socket: Socket) => {
     const currentLobby = socket.data.gameCode;
     if (currentLobby && currentLobby !== gameCode) {
       socket.leave(currentLobby);
+      socket.leave(`user:${user._id}:${currentLobby}`);
     }
 
     const lobby = await getFullLobby(gameCode);
@@ -278,6 +282,7 @@ export const setupLobbySocket = (io: Server, socket: Socket) => {
       lobby.players.map((u) => u._id).includes(user._id)
     ) {
       socket.join(gameCode);
+      socket.join(`user:${user._id}:${gameCode}`);
       socket.data.gameCode = gameCode;
 
       if (lobby.status === "lobby") {
@@ -295,7 +300,7 @@ export const setupLobbySocket = (io: Server, socket: Socket) => {
         const questionKey = `game:answer:answers:${gameCode}:${lobby.gameState.questionIndex}`;
         const rawAnswers = await redis.hGetAll(questionKey);
         const playersAnswer = parseRedisHash(rawAnswers);
-        io.to(`user:${lobby.host?._id}`).emit(
+        io.to(`user:${lobby.host?._id}:${gameCode}`).emit(
           "question-dashboard",
           playersAnswer
         );
@@ -432,6 +437,7 @@ export const setupLobbySocket = (io: Server, socket: Socket) => {
         optionIndex,
         key,
         score: 0,
+        answeredAt: new Date().toISOString(),
       };
 
       if (curQuestion.correctKey === key) {
@@ -443,6 +449,7 @@ export const setupLobbySocket = (io: Server, socket: Socket) => {
           questionKey,
           user._id,
           JSON.stringify({
+            ...updated,
             optionIndex,
             key,
             score: scoreYouGet,
@@ -456,7 +463,10 @@ export const setupLobbySocket = (io: Server, socket: Socket) => {
 
       const rawAnswers = await redis.hGetAll(questionKey);
       const playersAnswer = parseRedisHash(rawAnswers);
-      io.to(`user:${hostUser?._id}`).emit("question-dashboard", playersAnswer);
+      io.to(`user:${hostUser?._id}:${gameCode}`).emit(
+        "question-dashboard",
+        playersAnswer
+      );
       ack?.({ ok: true });
     }
   );
@@ -480,7 +490,10 @@ export const setupLobbySocket = (io: Server, socket: Socket) => {
 
     await removePlayer(gameCode, userId, true);
 
-    io.to(`user:${userId}`).emit("kicked", "You were kicked from the lobby");
+    io.to(`user:${userId}:${gameCode}`).emit(
+      "kicked",
+      "You were kicked from the lobby"
+    );
     const emitLobby = await getFullLobby(gameCode);
     io.to(gameCode).emit("lobby-updated", emitLobby);
   });

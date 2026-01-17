@@ -20,6 +20,9 @@ const answerLogSchema = new mongoose.Schema(
       type: Number,
       required: true,
     },
+    answeredAt: {
+      type: String,
+    },
   },
   { _id: false }
 );

@@ -340,6 +340,7 @@ export const getHistoryDetail = async (req: Request, res: Response) => {
                 key: "$answers.key",
                 questionIndex: "$answers.questionIndex",
                 score: "$answers.score",
+                answeredAt: "$answers.answeredAt",
                 _id: {
                   $ifNull: ["$player.userId", "$player.guestId"],
                 },

@@ -215,21 +215,28 @@ function QuestionPage({
   const playerMap = useMemo(() => {
     return Object.fromEntries(players.map((p) => [p._id, p]));
   }, [players]);
+
   const groupedAnswers = useMemo<GroupedAnswers>(() => {
     const result: GroupedAnswers = { A: [], B: [], C: [], D: [] };
 
-    playersAnswer.forEach((answer) => {
-      if (!answer.key) return;
+    const sorted = [...(playersAnswer ?? [])].sort((a, b) => {
+      const tA = a.answeredAt ? new Date(a.answeredAt).getTime() : 0;
+      const tB = b.answeredAt ? new Date(b.answeredAt).getTime() : 0;
+      return tA - tB;
+    });
+
+    for (const answer of sorted) {
+      if (!answer.key) continue;
 
       const player = playerMap[answer._id];
-      if (!player) return;
+      if (!player) continue;
 
       result[answer.key].push({
         ...answer,
         avatar: player.avatar,
         username: player.username,
       });
-    });
+    }
 
     return result;
   }, [playersAnswer, playerMap]);

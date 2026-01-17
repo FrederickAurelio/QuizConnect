@@ -58,6 +58,7 @@ function LobbyPageRouting({ lobby: lobbyProps }: { lobby: LobbyState }) {
     };
 
     const handlePlayersAnswer = (playersAnswer: AnswerLog[]) => {
+      console.log("GOTT BUAM", playersAnswer);
       setPlayerAnswer(playersAnswer);
     };
 

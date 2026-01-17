@@ -7,6 +7,7 @@ export type AnswerLog = {
   optionIndex: number | null;
   key: ("A" | "B" | "C" | "D") | null;
   score?: number;
+  answeredAt?: string;
 };
 
 export type UserInfo = {

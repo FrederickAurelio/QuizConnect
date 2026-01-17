@@ -14,9 +14,6 @@ export const setupSocket = (httpServer: HttpServer) => {
 
   io.on("connection", (socket) => {
     setupLobbySocket(io, socket);
-
-    const user = socket.data.user;
-    socket.join(`user:${user._id}`);
   });
 
   return io;
