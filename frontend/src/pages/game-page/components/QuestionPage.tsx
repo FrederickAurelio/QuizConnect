@@ -212,6 +212,8 @@ function QuestionPage({
   const isAnswered = answerForThisQuestion?.key;
   const isCorrect = resultAnswer === isAnswered;
 
+  const isAllPlayerAnswered = !playersAnswer.some((p) => p.key === null);
+
   const playerMap = useMemo(() => {
     return Object.fromEntries(players.map((p) => [p._id, p]));
   }, [players]);
@@ -265,7 +267,7 @@ function QuestionPage({
           "border-amber-500/50 bg-amber-500/10 text-amber-600 dark:text-amber-400",
         iconBg: "bg-amber-500",
         icon: <AlarmClock className="size-6" />,
-        title: "Time's Up!",
+        title: isAllPlayerAnswered ? "All players answered!" : "Time's Up!",
         desc: isHost
           ? `${resultAnswer ? groupedAnswers[resultAnswer].length : 0} players answer correctly!`
           : "You didn't select an answer in time.",

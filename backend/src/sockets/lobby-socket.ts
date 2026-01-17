@@ -40,202 +40,221 @@ export const parseRedisHash = <T = any>(
     ...JSON.parse(json),
   }));
 
-export const handleGameFlow = async (
-  io: Server,
-  gameCode: string,
-  duration: number
-) => {
-  setTimeout(async () => {
-    const [lobby, questions, allPlayers, hostUser] = await Promise.all([
-      getLobby(gameCode),
-      getQuestions(gameCode),
-      getAllPlayers(gameCode),
-      getHostData(gameCode),
-    ]);
-    if (
-      !lobby ||
-      lobby.status !== "started" ||
-      !questions ||
-      questions.length <= 0 ||
-      !hostUser
-    )
-      return;
+const gameFlowTimers = new Map<string, NodeJS.Timeout>();
+function scheduleNextGameFlow(io: Server, gameCode: string, duration: number) {
+  // clear existing timer
+  const existing = gameFlowTimers.get(gameCode);
+  if (existing) {
+    clearTimeout(existing);
+  }
 
-    if (lobby.gameState.status === "cooldown") {
-      lobby.gameState.questionIndex += 1;
-      lobby.gameState.duration = Number(lobby.settings.timePerQuestion) * 1000;
-      lobby.gameState.status = "question";
-      lobby.quiz.curQuestion = {
-        ...questions[lobby.gameState.questionIndex],
-        correctKey: undefined,
-      } as Question;
-    } else if (lobby.gameState.status === "question") {
-      lobby.gameState.duration = 5 * 1000;
-      lobby.gameState.status = "result";
-      lobby.quiz.curQuestion = {
-        ...questions[lobby.gameState.questionIndex],
-      } as Question;
+  const timer = setTimeout(() => {
+    gameFlowTimers.delete(gameCode);
+    handleNextGameFlow(io, gameCode);
+  }, duration);
 
-      const scoreKey = `game:answer:score:${gameCode}`;
-      const totalScores = await redis.hGetAll(scoreKey);
+  gameFlowTimers.set(gameCode, timer);
+}
 
-      const playerKey = `game:players:${gameCode}`;
+export function skipGameFlow(io: Server, gameCode: string) {
+  const timer = gameFlowTimers.get(gameCode);
+  if (timer) {
+    clearTimeout(timer);
+    gameFlowTimers.delete(gameCode);
+  }
 
-      const multi = redis.multi();
-      for (const player of allPlayers) {
-        multi.hSet(
-          playerKey,
-          player._id,
-          JSON.stringify({
-            ...player,
-            totalScore: Number(totalScores[player._id] ?? 0),
-          })
-        );
-      }
-      multi.expire(scoreKey, EXPIRY_SECONDS);
-      multi.expire(playerKey, EXPIRY_SECONDS);
-      await multi.exec();
-    } else if (
-      lobby.gameState.status === "result" &&
-      lobby.gameState.questionIndex + 1 < questions.length
-    ) {
-      const correctKey = `game:answer:correct:${gameCode}`;
+  handleNextGameFlow(io, gameCode);
+}
 
-      await redis.set(correctKey, allPlayers.length, {
-        EX: EXPIRY_SECONDS,
-      });
+export const handleNextGameFlow = async (io: Server, gameCode: string) => {
+  const [lobby, questions, allPlayers, hostUser] = await Promise.all([
+    getLobby(gameCode),
+    getQuestions(gameCode),
+    getAllPlayers(gameCode),
+    getHostData(gameCode),
+  ]);
+  if (
+    !lobby ||
+    lobby.status !== "started" ||
+    !questions ||
+    questions.length <= 0 ||
+    !hostUser
+  )
+    return;
 
-      lobby.gameState.duration = Number(lobby.settings.cooldown) * 1000;
-      lobby.gameState.status = "cooldown";
-    } else if (lobby.gameState.status === "result") {
-      lobby.status = "ended";
-    }
-    lobby.gameState.startTime = new Date().toISOString();
+  if (lobby.gameState.status === "cooldown") {
+    lobby.gameState.questionIndex += 1;
+    lobby.gameState.duration = Number(lobby.settings.timePerQuestion) * 1000;
+    lobby.gameState.status = "question";
+    lobby.quiz.curQuestion = {
+      ...questions[lobby.gameState.questionIndex],
+      correctKey: undefined,
+    } as Question;
+  } else if (lobby.gameState.status === "question") {
+    lobby.gameState.duration = 5 * 1000;
+    lobby.gameState.status = "result";
+    lobby.quiz.curQuestion = {
+      ...questions[lobby.gameState.questionIndex],
+    } as Question;
 
-    await saveLobby(gameCode, lobby);
-    const emitLobby = await getFullLobby(gameCode);
+    const scoreKey = `game:answer:score:${gameCode}`;
+    const totalScores = await redis.hGetAll(scoreKey);
 
-    // after cooldown mode, because this was just set to question
-    if (lobby.gameState.status === "question") {
-      const questionKey = `game:answer:answers:${gameCode}:${lobby.gameState.questionIndex}`; // new qIndex
-      const rawAnswers = await redis.hGetAll(questionKey);
-      const playersAnswer = parseRedisHash(rawAnswers);
+    const playerKey = `game:players:${gameCode}`;
 
-      io.to(`user:${hostUser?._id}:${gameCode}`).emit(
-        "question-dashboard",
-        playersAnswer
-      );
-    }
-
-    if (lobby.status !== "ended") {
-      handleGameFlow(io, gameCode, lobby.gameState.duration);
-    } else {
-      // -------------- LAYER 1 --------------
-      const winnerUser = (emitLobby?.players ?? []).reduce((best, p) => {
-        return p.totalScore > best.totalScore ? p : best;
-      });
-      const layer1 = new HistoryQuery({
-        gameCode: emitLobby?.gameCode,
-        quiz: {
-          title: emitLobby?.quiz.title ?? "",
-          description: emitLobby?.quiz.description ?? "",
-          questionCount: emitLobby?.settings.questionCount ?? 0,
-        },
-        host: emitLobby?.host._id ?? "",
-        players: (emitLobby?.players ?? [])
-          .map((player) => player._id)
-          .filter((p) => !p.startsWith("guest_")),
-        playerCount: (emitLobby?.players ?? []).length ?? 0,
-        winner: {
-          userId: winnerUser._id.startsWith("guest_") ? null : winnerUser._id,
-          guestId: winnerUser._id.startsWith("guest_") ? winnerUser._id : null,
-          username: winnerUser?.username ?? "",
-          avatar: winnerUser?.avatar ?? "",
-          totalScore: winnerUser?.totalScore ?? 0,
-        },
-        sessionCreatedAt:
-          emitLobby?.sessionCreatedAt ?? new Date().toISOString(),
-      });
-
-      const allPlayersSnapshot =
-        emitLobby?.players
-          .map((p) => ({
-            userId: p._id.startsWith("guest_") ? null : p._id,
-            guestId: p._id.startsWith("guest_") ? p._id : null,
-            username: p?.username ?? "",
-            avatar: p?.avatar ?? "",
-            totalScore: p?.totalScore ?? 0,
-          }))
-          .sort((a, b) => (b.totalScore ?? 0) - (a.totalScore ?? 0)) ?? [];
-
-      // -------------- LAYER 2 --------------
-      const layer2 = new HistoryDetail({
-        _id: layer1._id,
-        gameCode: emitLobby?.gameCode,
-        quiz: {
-          title: emitLobby?.quiz.title ?? "",
-          description: emitLobby?.quiz.description ?? "",
-          questions: questions,
-        },
-        host: emitLobby?.host._id ?? "",
-        players: allPlayersSnapshot,
-        settings: emitLobby?.settings,
-        sessionCreatedAt:
-          emitLobby?.sessionCreatedAt ?? new Date().toISOString(),
-      });
-
-      // -------------- LAYER 3 --------------
-
-      const questionCount = emitLobby?.settings.questionCount ?? 0;
-
-      const playerResults = await Promise.all(
-        allPlayersSnapshot.map(async (p, rankIdx) => {
-          const multi = redis.multi();
-          const playerKey = (p.userId || p.guestId) as string;
-
-          for (let i = 0; i < questionCount; i++) {
-            multi.hGet(`game:answer:answers:${gameCode}:${i}`, playerKey);
-          }
-
-          const results = await multi.exec();
-
-          const answers: (AnswerLog & { questionIndex: number })[] =
-            results.map((r, qIdx) => {
-              if (typeof r === "string") {
-                try {
-                  return { ...JSON.parse(r), questionIndex: qIdx };
-                } catch {}
-              }
-              return {
-                optionIndex: null,
-                key: null,
-                score: 0,
-                questionIndex: qIdx,
-              };
-            });
-
-          return {
-            gameId: layer1._id,
-            player: p,
-            totalScore: p.totalScore,
-            rank: rankIdx + 1,
-            answers,
-          };
+    const multi = redis.multi();
+    for (const player of allPlayers) {
+      multi.hSet(
+        playerKey,
+        player._id,
+        JSON.stringify({
+          ...player,
+          totalScore: Number(totalScores[player._id] ?? 0),
         })
       );
-
-      await Promise.all([
-        layer1.save(),
-        layer2.save(),
-        HistoryPlayerResult.insertMany(playerResults),
-      ]);
-
-      if (emitLobby) emitLobby.gameId = String(layer1._id);
-      await deleteLobbySession(gameCode, hostUser._id, lobby.quiz._id);
     }
+    multi.expire(scoreKey, EXPIRY_SECONDS);
+    multi.expire(playerKey, EXPIRY_SECONDS);
+    await multi.exec();
+  } else if (
+    lobby.gameState.status === "result" &&
+    lobby.gameState.questionIndex + 1 < questions.length
+  ) {
+    const correctKey = `game:answer:correct:${gameCode}`;
 
-    io.to(gameCode).emit("lobby-updated", emitLobby);
-  }, duration);
+    await redis.set(correctKey, allPlayers.length, {
+      EX: EXPIRY_SECONDS,
+    });
+
+    lobby.gameState.duration = Number(lobby.settings.cooldown) * 1000;
+    lobby.gameState.status = "cooldown";
+  } else if (lobby.gameState.status === "result") {
+    lobby.status = "ended";
+  }
+  lobby.gameState.startTime = new Date().toISOString();
+
+  await saveLobby(gameCode, lobby);
+  const emitLobby = await getFullLobby(gameCode);
+
+  // after cooldown mode, because this was just set to question
+  if (lobby.gameState.status === "question") {
+    const questionKey = `game:answer:answers:${gameCode}:${lobby.gameState.questionIndex}`; // new qIndex
+    const rawAnswers = await redis.hGetAll(questionKey);
+    const playersAnswer = parseRedisHash(rawAnswers);
+
+    io.to(`user:${hostUser?._id}:${gameCode}`).emit(
+      "question-dashboard",
+      playersAnswer
+    );
+  }
+
+  if (lobby.status !== "ended") {
+    scheduleNextGameFlow(io, gameCode, lobby.gameState.duration);
+  } else {
+    // -------------- LAYER 1 --------------
+    const winnerUser = (emitLobby?.players ?? []).reduce((best, p) => {
+      return p.totalScore > best.totalScore ? p : best;
+    });
+    const layer1 = new HistoryQuery({
+      gameCode: emitLobby?.gameCode,
+      quiz: {
+        title: emitLobby?.quiz.title ?? "",
+        description: emitLobby?.quiz.description ?? "",
+        questionCount: emitLobby?.settings.questionCount ?? 0,
+      },
+      host: emitLobby?.host._id ?? "",
+      players: (emitLobby?.players ?? [])
+        .map((player) => player._id)
+        .filter((p) => !p.startsWith("guest_")),
+      playerCount: (emitLobby?.players ?? []).length ?? 0,
+      winner: {
+        userId: winnerUser._id.startsWith("guest_") ? null : winnerUser._id,
+        guestId: winnerUser._id.startsWith("guest_") ? winnerUser._id : null,
+        username: winnerUser?.username ?? "",
+        avatar: winnerUser?.avatar ?? "",
+        totalScore: winnerUser?.totalScore ?? 0,
+      },
+      sessionCreatedAt: emitLobby?.sessionCreatedAt ?? new Date().toISOString(),
+    });
+
+    const allPlayersSnapshot =
+      emitLobby?.players
+        .map((p) => ({
+          userId: p._id.startsWith("guest_") ? null : p._id,
+          guestId: p._id.startsWith("guest_") ? p._id : null,
+          username: p?.username ?? "",
+          avatar: p?.avatar ?? "",
+          totalScore: p?.totalScore ?? 0,
+        }))
+        .sort((a, b) => (b.totalScore ?? 0) - (a.totalScore ?? 0)) ?? [];
+
+    // -------------- LAYER 2 --------------
+    const layer2 = new HistoryDetail({
+      _id: layer1._id,
+      gameCode: emitLobby?.gameCode,
+      quiz: {
+        title: emitLobby?.quiz.title ?? "",
+        description: emitLobby?.quiz.description ?? "",
+        questions: questions,
+      },
+      host: emitLobby?.host._id ?? "",
+      players: allPlayersSnapshot,
+      settings: emitLobby?.settings,
+      sessionCreatedAt: emitLobby?.sessionCreatedAt ?? new Date().toISOString(),
+    });
+
+    // -------------- LAYER 3 --------------
+
+    const questionCount = emitLobby?.settings.questionCount ?? 0;
+
+    const playerResults = await Promise.all(
+      allPlayersSnapshot.map(async (p, rankIdx) => {
+        const multi = redis.multi();
+        const playerKey = (p.userId || p.guestId) as string;
+
+        for (let i = 0; i < questionCount; i++) {
+          multi.hGet(`game:answer:answers:${gameCode}:${i}`, playerKey);
+        }
+
+        const results = await multi.exec();
+
+        const answers: (AnswerLog & { questionIndex: number })[] = results.map(
+          (r, qIdx) => {
+            if (typeof r === "string") {
+              try {
+                return { ...JSON.parse(r), questionIndex: qIdx };
+              } catch {}
+            }
+            return {
+              optionIndex: null,
+              key: null,
+              score: 0,
+              questionIndex: qIdx,
+            };
+          }
+        );
+
+        return {
+          gameId: layer1._id,
+          player: p,
+          totalScore: p.totalScore,
+          rank: rankIdx + 1,
+          answers,
+        };
+      })
+    );
+
+    await Promise.all([
+      layer1.save(),
+      layer2.save(),
+      HistoryPlayerResult.insertMany(playerResults),
+    ]);
+
+    if (emitLobby) emitLobby.gameId = String(layer1._id);
+    await deleteLobbySession(gameCode, hostUser._id, lobby.quiz._id);
+  }
+
+  io.to(gameCode).emit("lobby-updated", emitLobby);
 };
 
 export const setupLobbySocket = (io: Server, socket: Socket) => {
@@ -467,6 +486,13 @@ export const setupLobbySocket = (io: Server, socket: Socket) => {
         "question-dashboard",
         playersAnswer
       );
+
+      // Check if everyone answered
+      const someUnanswered = playersAnswer.some((p) => p.key === null);
+      if (!someUnanswered) {
+        skipGameFlow(io, gameCode);
+      }
+
       ack?.({ ok: true });
     }
   );
@@ -593,6 +619,7 @@ export const setupLobbySocket = (io: Server, socket: Socket) => {
 
     const emitLobby = await getFullLobby(gameCode);
     io.to(gameCode).emit("lobby-updated", emitLobby);
-    handleGameFlow(io, gameCode, lobby.gameState.duration);
+
+    scheduleNextGameFlow(io, gameCode, lobby.gameState.duration);
   });
 };
