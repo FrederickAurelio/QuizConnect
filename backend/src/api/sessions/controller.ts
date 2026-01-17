@@ -111,7 +111,7 @@ export const hostQuiz = async (req: Request, res: Response) => {
         questionCount: quiz.questions.length,
         shuffleQuestions: false,
         shuffleAnswers: false,
-        timePerQuestion: "20",
+        timePerQuestion: "10",
         cooldown: "5",
       },
       banned: [],

@@ -299,6 +299,7 @@ export const getUser = async (req: Request, res: Response) => {
         message: "Session not initialized",
         data: null,
         errors: null,
+        serverNow: new Date().toISOString(),
       });
     }
 
@@ -311,6 +312,7 @@ export const getUser = async (req: Request, res: Response) => {
           message: "User not found",
           data: null,
           errors: null,
+          serverNow: new Date().toISOString(),
         });
       }
 
@@ -320,6 +322,7 @@ export const getUser = async (req: Request, res: Response) => {
           userId: user._id.toString(),
           username: user.username,
           avatar: user.avatar || "",
+          serverNow: new Date().toISOString(),
         },
         errors: null,
       });
@@ -333,6 +336,7 @@ export const getUser = async (req: Request, res: Response) => {
           userId: req.session.userId,
           username: req.session.username,
           avatar: req.session.avatar,
+          serverNow: new Date().toISOString(),
         },
         errors: null,
       });
@@ -356,6 +360,7 @@ export const getUser = async (req: Request, res: Response) => {
         userId: tempId,
         username: tempUsername,
         avatar: randomAvatarSrc,
+        serverNow: new Date().toISOString(),
       },
       errors: null,
     });

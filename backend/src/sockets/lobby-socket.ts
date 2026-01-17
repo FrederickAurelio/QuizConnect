@@ -546,7 +546,7 @@ export const setupLobbySocket = (io: Server, socket: Socket) => {
 
     lobby.status = "started";
     lobby.gameState.questionIndex = -1;
-    lobby.gameState.duration = 30000;
+    lobby.gameState.duration = 10000;
     lobby.gameState.startTime = new Date().toISOString();
     lobby.gameState.status = "cooldown";
 

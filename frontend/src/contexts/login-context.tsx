@@ -26,6 +26,7 @@ type LoginContextType = {
   setUser: Dispatch<SetStateAction<UserType | null>>;
   clearUser: () => void;
   isPending: boolean;
+  offSet: number;
 };
 
 const LoginContext = createContext<LoginContextType | null>(null);
@@ -35,6 +36,7 @@ function LoginProvider({ children }: { children: ReactNode }) {
   const openLogin = () => setIsLoginDialogOpen(true);
   const closeLogin = () => setIsLoginDialogOpen(false);
 
+  const [offSet, setOffset] = useState(0);
   const [user, setUser] = useState<UserType | null>(null);
   const isAuthenticated = user?.type === "auth";
   const clearUser = () => {
@@ -49,7 +51,10 @@ function LoginProvider({ children }: { children: ReactNode }) {
   } = useQuery({
     queryKey: ["currentUser"],
     queryFn: async () => {
+      const t0 = Date.now();
       const { data } = await initialGetUser();
+      const t1 = Date.now();
+
       if (!data) return null;
       const typeUser = data?.userId.startsWith("guest_") ? "guest" : "auth";
       setUser({
@@ -58,6 +63,10 @@ function LoginProvider({ children }: { children: ReactNode }) {
         username: data.username,
         avatar: data.avatar,
       });
+      const serverNowMs = new Date(data.serverNow).getTime();
+      const offset = serverNowMs - (t0 + t1) / 2;
+      setOffset(offset);
+
       return data;
     },
     staleTime: Infinity,
@@ -78,6 +87,7 @@ function LoginProvider({ children }: { children: ReactNode }) {
         isLoginDialogOpen,
         openLogin,
         closeLogin,
+        offSet,
       }}
     >
       {children}

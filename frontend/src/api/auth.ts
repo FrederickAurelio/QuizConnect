@@ -1,6 +1,13 @@
 import type { ApiResponse } from "@/api";
 import { api } from "@/lib/axios";
 
+export type InitialResponse = ApiResponse<{
+  userId: string;
+  username: string;
+  avatar: string;
+  serverNow: string;
+}>;
+
 export type ProfileUserResponse = ApiResponse<{
   userId: string;
   username: string;
@@ -46,7 +53,7 @@ export const logoutUser = async () => {
 };
 
 export const initialGetUser = async () => {
-  const res = await api.get<ProfileUserResponse>("/auth/initial");
+  const res = await api.get<InitialResponse>("/auth/initial");
   return res.data;
 };
 
