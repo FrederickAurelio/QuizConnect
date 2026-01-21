@@ -68,7 +68,7 @@ function GameSettings({
   return (
     <div
       className={clsx(
-        "bg-sidebar border-border col-span-1 m-10 ml-0 flex min-h-0 w-full flex-1 flex-col gap-6 rounded-2xl border px-5 py-5",
+        "bg-sidebar border-border col-span-1 m-10 ml-0 flex min-h-0 w-full flex-1 flex-col gap-6 rounded-2xl border px-5 py-5 max-sm:min-h-[560px] max-sm:my-0",
         !isHost && "opacity-75",
       )}
     >

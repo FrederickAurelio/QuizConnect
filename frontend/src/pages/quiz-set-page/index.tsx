@@ -70,8 +70,8 @@ function QuizSetPage() {
       {/* Header */}
       <div className="flex shrink-0 items-end justify-between">
         <div className="flex flex-col">
-          <h1 className="text-3xl font-bold">My Library</h1>
-          <p className="text-white/60">Manage your quizzes and host live.</p>
+          <h1 className="text-3xl font-bold max-sm:text-xl">My Library</h1>
+          <p className="text-white/60 max-sm:text-xs">Manage your quizzes and host live.</p>
         </div>
 
         <div className="border-border bg-card flex items-center rounded-lg border p-1">

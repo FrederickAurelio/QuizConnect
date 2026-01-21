@@ -19,7 +19,7 @@ function JoinedCard({
   const isHost = host._id === user?.userId;
 
   return (
-    <div className="bg-card border-border flex min-h-0 w-full flex-1 flex-col gap-4 rounded-xl border px-5 py-4 text-lg font-semibold">
+    <div className="bg-card border-border flex min-h-0 w-full flex-1 flex-col gap-4 rounded-xl border px-5 py-4 text-lg font-semibold max-sm:min-h-[400px]">
       <div className="flex w-full items-center justify-between">
         <h1 className="flex gap-2 text-base text-white/60">
           <Users className="translate-y-px" size={20} />

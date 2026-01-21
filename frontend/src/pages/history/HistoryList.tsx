@@ -90,9 +90,9 @@ function HistoryList() {
   }, [inView, isFetchingNextPage, hasNextPage, fetchNextPage]);
 
   return (
-    <div className="flex h-full w-full flex-col gap-2 px-20 pt-4">
+    <div className="flex h-full w-full flex-col gap-2 px-20 pt-4 max-sm:px-2">
       {/* Header */}
-      <div className="flex shrink-0 items-end justify-between">
+      <div className="flex shrink-0 items-end justify-between max-sm:px-1">
         <div className="flex flex-col">
           <h1 className="text-3xl font-bold">History</h1>
           <p className="text-white/60">Your past games and results.</p>
@@ -117,7 +117,7 @@ function HistoryList() {
       </div>
 
       {/* Content */}
-      <div className="scroll-primary flex w-full flex-col gap-3 overflow-y-auto p-3">
+      <div className="scroll-primary flex w-full flex-col gap-3 overflow-y-auto p-3 max-sm:p-1">
         {histories.length < 1 && !isFetchingNextPage && !isFetching && (
           <div className="flex flex-col items-center justify-center py-20 opacity-60">
             <div className="bg-secondary/20 mb-4 rounded-full p-6">

@@ -70,7 +70,7 @@ function CreatePageFooter({ form, editMode, quizId }: Props) {
 
   return (
     <div className="flex min-h-fit flex-1 shrink-0 items-end">
-      <div className="border-border flex w-full items-center justify-between border-t px-2 py-3 pb-5">
+      <div className="border-border flex w-full items-center justify-between border-t px-2 py-3 pb-5 max-sm:flex-col max-sm:gap-1">
         <div className="flex flex-col">
           <p
             className={`font-semibold transition-colors ${
@@ -83,7 +83,7 @@ function CreatePageFooter({ form, editMode, quizId }: Props) {
           </p>
 
           {!isSatisfied && (
-            <span className="text-xs text-white/40">
+            <span className="text-xs text-white/40 max-sm:text-[10px]">
               Add {minQuestions - currentCount} more to create the quiz.
             </span>
           )}

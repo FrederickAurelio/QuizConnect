@@ -78,7 +78,7 @@ function AvatarMenu() {
     <Popover open={openMenu}>
       <PopoverAnchor>
         <div
-          className="bg-card border-border flex w-60 items-center justify-between gap-2 rounded-xl border p-1.5 px-2"
+          className="bg-card border-border flex w-60 items-center justify-between gap-2 rounded-xl border p-1.5 px-2 max-sm:w-48"
           onClick={() => setOpenMenu((prev) => !prev)}
         >
           <div className="flex min-w-0 items-center gap-2">

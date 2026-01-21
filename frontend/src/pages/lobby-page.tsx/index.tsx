@@ -45,21 +45,32 @@ function LobbyPage({ lobby }: { lobby: LobbyState }) {
   };
 
   return (
-    <div className="grid h-full w-full grid-cols-3">
+    <div className="grid h-full w-full grid-cols-3 overflow-x-hidden overflow-y-auto max-sm:flex max-sm:flex-col">
       {/* LEFT */}
-      <div className="col-span-2 flex h-full flex-col gap-3 overflow-hidden p-6">
+      <div className="scroll-primary col-span-2 flex h-full flex-col gap-3 overflow-hidden p-6 max-sm:overflow-y-auto">
         <LobbyPageHeader gameCode={gameCode} quizMetadata={quizMetadata} />
         <JoinedCard host={host} players={players} />
+        <div className="hidden max-sm:block">
+          <GameSettings
+            playerCount={lobby.players.length}
+            isHost={isHost}
+            totalAvailableQuestions={totalAvailableQuestions}
+            settings={isHost ? settingsDraft : serverSettings}
+            updateSetting={updateSetting}
+          />
+        </div>
       </div>
 
       {/* RIGHT */}
-      <GameSettings
-        playerCount={lobby.players.length}
-        isHost={isHost}
-        totalAvailableQuestions={totalAvailableQuestions}
-        settings={isHost ? settingsDraft : serverSettings}
-        updateSetting={updateSetting}
-      />
+      <div className="block max-sm:hidden">
+        <GameSettings
+          playerCount={lobby.players.length}
+          isHost={isHost}
+          totalAvailableQuestions={totalAvailableQuestions}
+          settings={isHost ? settingsDraft : serverSettings}
+          updateSetting={updateSetting}
+        />
+      </div>
     </div>
   );
 }

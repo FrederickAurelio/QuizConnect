@@ -112,8 +112,8 @@ function HistoryDetail() {
   const playerMap = Object.fromEntries(history.players.map((p) => [p._id, p]));
 
   return (
-    <div className="scroll-primary flex h-full flex-col items-center gap-2 overflow-y-auto py-10">
-      <div className="bg-card border-border mb-10 flex w-full max-w-[850px] shrink-0 items-center gap-6 rounded-xl border px-8 py-3 text-lg font-semibold">
+    <div className="scroll-primary flex h-full flex-col items-center gap-2 overflow-x-hidden overflow-y-auto py-10">
+      <div className="bg-card border-border mb-10 flex w-full max-w-[850px] shrink-0 items-center gap-6 rounded-xl border px-8 py-3 text-lg font-semibold max-sm:flex-col max-sm:items-start max-sm:gap-2">
         <div className="flex flex-col">
           <h2 className="text-primary pl-1 text-xs leading-tight">HOST</h2>
           <div className="bg-secondary/30 flex max-w-[240px] items-center gap-1 rounded-xl p-1 pr-2 transition-colors duration-150 ease-in-out">
@@ -137,7 +137,7 @@ function HistoryDetail() {
           </div>
         </div>
 
-        <hr className="bg-border h-4/5 w-px" />
+        <hr className="bg-border h-4/5 w-px max-sm:hidden" />
 
         <div className="flex h-16 flex-1 flex-col justify-center">
           <h1 className="line-clamp-1 text-xl text-white/80">
@@ -147,7 +147,7 @@ function HistoryDetail() {
             {history.quiz.description}
           </p>
         </div>
-        <div className="flex items-center gap-6">
+        <div className="flex items-center gap-6 max-sm:w-full max-sm:justify-end max-sm:pt-1.5">
           {/* Added gap between Date and Code */}
           <div className="flex flex-col items-end">
             <span className="text-[10px] leading-tight text-white/40 uppercase">

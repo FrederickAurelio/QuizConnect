@@ -51,7 +51,7 @@ function LandingPage() {
     }
   };
   return (
-    <div className="grid h-[90%] w-full grid-cols-2">
+    <div className="scroll-primary grid h-[90%] w-full grid-cols-2 overflow-x-hidden overflow-y-auto max-sm:h-full max-sm:grid-cols-1 max-sm:gap-10 max-sm:py-8">
       {/* JOIN */}
       <BackgroundWrapper className="group flex h-full flex-col items-center justify-center gap-6">
         <div className="border-primary text-primary bg-secondary rounded-3xl border p-4 opacity-60 transition-all duration-200 group-hover:p-[17px] group-hover:opacity-100">
@@ -91,7 +91,7 @@ function LandingPage() {
           </Button>
         </div>
       </BackgroundWrapper>
-
+      <hr className="hidden border-white/10 max-sm:block" />
       {/* HOST */}
       <BackgroundWrapper className="group flex h-full flex-col items-center justify-center gap-6">
         <div className="border-primary text-primary bg-secondary rounded-3xl border p-5 opacity-60 transition-all duration-200 group-hover:p-[22px] group-hover:opacity-100">
