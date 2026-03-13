@@ -1,5 +1,6 @@
 import { server, PORT } from "./app.js";
 
-server.listen(PORT, "127.0.0.1", () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+const host = process.env.NODE_ENV === "production" ? "0.0.0.0" : "127.0.0.1";
+server.listen(PORT, host, () => {
+  console.log(`Server running on http://${host}:${PORT}`);
 });

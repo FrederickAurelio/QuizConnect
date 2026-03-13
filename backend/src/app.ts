@@ -14,11 +14,15 @@ import sessionRouter from "./api/sessions/router.js";
 import { setupSocket } from "./sockets/index.js";
 import historyRouter from "./api/history/router.js";
 
+// Local dev: load from .env.local. In Docker, env vars come from docker-compose (no file).
 dotenv.config({ path: ".env.local" });
+
+const MONGODB_URI =
+  process.env.MONGODB_URI || "mongodb://localhost:27017/QuizzConnect";
 
 // Initial setup and middleware
 mongoose
-  .connect("mongodb://localhost:27017/QuizzConnect")
+  .connect(MONGODB_URI)
   .then(() => console.log("Connected to Database"))
   .catch((err) => console.error(err));
 
@@ -27,9 +31,10 @@ const app = express();
 
 const server = http.createServer(app);
 
+const corsOrigin = process.env.CORS_ORIGIN || "http://localhost:3221";
 app.use(
   cors({
-    origin: "http://localhost:3221",
+    origin: corsOrigin,
     methods: ["GET", "POST", "DELETE", "PUT"],
     allowedHeaders: [
       "Content-Type",
@@ -92,16 +97,20 @@ io.use((socket, next) => {
   next();
 });
 
-app.use("/auth", authRoute);
-app.use("/quiz", quizRouter);
-app.use("/sessions", sessionRouter);
-app.use("/history", historyRouter);
-
-// Middleware to refresh session expiration
+// Middleware to refresh session expiration (run for every request)
 app.use((req: Request, res: Response, next: NextFunction) => {
   if (req.session) req.session.touch();
   next();
 });
+
+// API routes under /api so frontend baseURL "/api" works when served from same host
+const apiRouter = express.Router();
+apiRouter.get("/health", (_req, res) => res.status(200).json({ status: "ok" }));
+apiRouter.use("/auth", authRoute);
+apiRouter.use("/quiz", quizRouter);
+apiRouter.use("/sessions", sessionRouter);
+apiRouter.use("/history", historyRouter);
+app.use("/api", apiRouter);
 
 // Centralized error handling middleware
 app.use((err: Error, req: Request, res: Response, next: NextFunction) => {

@@ -1,0 +1,9 @@
+# Env and secrets (Docker and local)
+.env
+!backend/.env
+.env.local
+.env.*.local
+
+# Dependencies and build
+node_modules
+dist

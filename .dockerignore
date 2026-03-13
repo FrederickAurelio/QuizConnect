@@ -1,0 +1,28 @@
+# Dependencies
+node_modules
+**/node_modules
+
+# Build outputs (we build inside Docker)
+backend/dist
+frontend/dist
+
+# Env and secrets (set via docker-compose or runtime)
+.env
+.env.local
+.env.*.local
+*.env
+
+# Git and IDE
+.git
+.gitignore
+.vscode
+.idea
+*.md
+!README.md
+
+# Misc
+*.log
+.DS_Store
+coverage
+.nyc_output
+*.tgz
