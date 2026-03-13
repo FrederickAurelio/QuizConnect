@@ -13,12 +13,12 @@ No shared app container; no serving the frontend from Express.
 
 Yes — you need Docker installed before running anything in this doc. On CachyOS/Arch, run these once:
 
-| Command | What it does |
-|--------|----------------|
-| `sudo pacman -S docker docker-compose` | Installs Docker Engine and the Compose plugin. |
-| `sudo systemctl start docker` | Starts the Docker service now. |
-| `sudo systemctl enable docker` | Starts Docker automatically after reboot. |
-| `sudo usermod -aG docker $USER` | Adds **your user** to the `docker` group so you can run `docker` without `sudo`. Without this, only root can run Docker. |
+| Command                                | What it does                                                                                                             |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `sudo pacman -S docker docker-compose` | Installs Docker Engine and the Compose plugin.                                                                           |
+| `sudo systemctl start docker`          | Starts the Docker service now.                                                                                           |
+| `sudo systemctl enable docker`         | Starts Docker automatically after reboot.                                                                                |
+| `sudo usermod -aG docker $USER`        | Adds **your user** to the `docker` group so you can run `docker` without `sudo`. Without this, only root can run Docker. |
 
 After `usermod`, the group change is not applied until you **log out and log back in** (or run `newgrp docker` in the same terminal). Then check:
 
@@ -34,11 +34,18 @@ Docker is trying to reach Docker Hub and the connection is timing out. Often thi
 1. **Retry** — sometimes it’s temporary: `docker compose up --build -d` again.
 
 2. **Use IPv4 only** — create or edit `/etc/docker/daemon.json` (sudo) and set:
+
    ```json
    {
-     "ipv6": false
+     "registry-mirrors": [
+       "https://docker.m.daocloud.io",
+       "https://registry.docker-cn.com"
+     ],
+     "ipv6": false,
+     "dns": ["1.1.1.1", "8.8.8.8"]
    }
    ```
+
    Then restart Docker: `sudo systemctl restart docker`, and run `docker compose up --build -d` again.
 
 3. **VPN / firewall** — if you use a VPN, try turning it off. Or allow Docker access to the internet (e.g. port 443 to registry-1.docker.io).
@@ -86,7 +93,7 @@ docker compose up --build -d
 - Starts:
   - **mongodb** – MongoDB on port **27017**, data in volume `mongo_data`.
   - **redis** – Redis on port **6379**, data in volume `redis_data`.
-  - **app** – Express API + Socket.IO on port **2000`.
+  - **app** – Express API + Socket.IO on port \*\*2000`.
   - **web** – Nginx on port **80**, serving the React build and proxying to `app`.
 
 **How to access it:**
@@ -104,18 +111,18 @@ This is your **production-style** way to run the app (or a staging server): code
 
 These all run from the **project root** (`QuizGame/`).
 
-| Task | Command | When to use it |
-|------|--------|----------------|
-| View logs from all services | `docker compose logs -f` | See what Mongo, Redis, app, and web are doing. |
-| Logs (app only) | `docker compose logs -f app` | Debug backend/API issues. |
-| Logs (web only) | `docker compose logs -f web` | Debug Nginx / frontend serving. |
-| See running containers | `docker compose ps` | Check which services are up and their ports. |
-| Stop everything (keep data) | `docker compose down` | Shut down all containers when you’re not using the app; volumes (`mongo_data`, `redis_data`) stay, so data is preserved. |
-| Stop everything **and delete data** | `docker compose down -v` | Reset all MongoDB/Redis data (use with care). |
-| Restart services without rebuilding | `docker compose restart` | Containers already built, just restart them (e.g. after a temporary issue). |
-| Restart only backend | `docker compose restart app` | When you changed only backend env or want to bounce the API. |
-| Restart only frontend | `docker compose restart web` | When Nginx/frontend got stuck but you didn’t change code. |
-| Rebuild after **code changes** | `docker compose up --build -d` | After you change backend or frontend code and want to update the production-style stack. |
+| Task                                | Command                        | When to use it                                                                                                           |
+| ----------------------------------- | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
+| View logs from all services         | `docker compose logs -f`       | See what Mongo, Redis, app, and web are doing.                                                                           |
+| Logs (app only)                     | `docker compose logs -f app`   | Debug backend/API issues.                                                                                                |
+| Logs (web only)                     | `docker compose logs -f web`   | Debug Nginx / frontend serving.                                                                                          |
+| See running containers              | `docker compose ps`            | Check which services are up and their ports.                                                                             |
+| Stop everything (keep data)         | `docker compose down`          | Shut down all containers when you’re not using the app; volumes (`mongo_data`, `redis_data`) stay, so data is preserved. |
+| Stop everything **and delete data** | `docker compose down -v`       | Reset all MongoDB/Redis data (use with care).                                                                            |
+| Restart services without rebuilding | `docker compose restart`       | Containers already built, just restart them (e.g. after a temporary issue).                                              |
+| Restart only backend                | `docker compose restart app`   | When you changed only backend env or want to bounce the API.                                                             |
+| Restart only frontend               | `docker compose restart web`   | When Nginx/frontend got stuck but you didn’t change code.                                                                |
+| Rebuild after **code changes**      | `docker compose up --build -d` | After you change backend or frontend code and want to update the production-style stack.                                 |
 
 **Typical “update prod” flow after changing code:**
 
@@ -152,12 +159,12 @@ Backend and frontend each have their own **Dockerfile** and build context (`./ba
 
 ## 6. What runs where
 
-| Service | Image | Port (host) | Role |
-|---------|--------|-------------|------|
-| **web** | Built from `frontend/Dockerfile` | 80 | Nginx: serves React build; config in `frontend/nginx.conf`; proxies `/api` and `/socket.io` to `app` |
-| **app** | Built from `backend/Dockerfile` | 2000 | Express API + Socket.IO; uses MongoDB and Redis |
-| **mongodb** | `mongo:7` | 27017 | Database (volume `mongo_data`) |
-| **redis** | `redis:7-alpine` | 6379 | Cache (volume `redis_data`) |
+| Service     | Image                            | Port (host) | Role                                                                                                 |
+| ----------- | -------------------------------- | ----------- | ---------------------------------------------------------------------------------------------------- |
+| **web**     | Built from `frontend/Dockerfile` | 80          | Nginx: serves React build; config in `frontend/nginx.conf`; proxies `/api` and `/socket.io` to `app` |
+| **app**     | Built from `backend/Dockerfile`  | 2000        | Express API + Socket.IO; uses MongoDB and Redis                                                      |
+| **mongodb** | `mongo:7`                        | 27017       | Database (volume `mongo_data`)                                                                       |
+| **redis**   | `redis:7-alpine`                 | 6379        | Cache (volume `redis_data`)                                                                          |
 
 Flow: **Browser → Nginx (80) → static or proxy to Express (2000)**. Same split as dev (Vite + Express), just Nginx instead of Vite.
 
@@ -243,7 +250,6 @@ We’ll cover:
 This is what you already do: Express + Vite on your PC, MongoDB + Redis in Docker.
 
 1. From project root, start only MongoDB + Redis in Docker.
-
    - **Normal dev (backend only talks to DBs):**
 
      ```bash
@@ -286,7 +292,6 @@ This is what you already do: Express + Vite on your PC, MongoDB + Redis in Docke
    ```
 
 4. Access:
-
    - Frontend (Vite): `http://localhost:3221`
    - Backend (Express): `http://localhost:2000`
 
@@ -327,7 +332,6 @@ ssh your-user@your-vps-ip
    ```
 
    Edit `backend/.env.local`:
-
    - Set `SESSION_SECRET` and `COOKIE_SECRET` to long random strings.
    - Optionally set `BREVO_API_KEY`, `SENDER_EMAIL`, etc.
 
@@ -353,7 +357,7 @@ web:
   container_name: quizzconnect-web
   restart: unless-stopped
   ports:
-    - "8085:80"   # hostPort:containerPort
+    - "8085:80" # hostPort:containerPort
   depends_on:
     - app
 ```
@@ -384,7 +388,6 @@ This:
   ```
 
 - With a domain you bought only for this project, e.g. `quizexample.com`:
-
   1. In your domain provider’s DNS, create an **A record**:
 
      ```text
@@ -461,7 +464,7 @@ web:
   container_name: quizzconnect-web
   restart: unless-stopped
   ports:
-    - "127.0.0.1:8086:80"   # host 8086 → container 80, localhost only
+    - "127.0.0.1:8086:80" # host 8086 → container 80, localhost only
   depends_on:
     - app
 ```
@@ -470,7 +473,7 @@ Now the web container is reachable only from the VPS as `http://127.0.0.1:8086`.
 
 #### 9.3.2 Host Nginx: listen on 8085 and proxy to Docker
 
-In your *existing* Nginx config on the VPS (outside this repo), add:
+In your _existing_ Nginx config on the VPS (outside this repo), add:
 
 ```nginx
 server {
