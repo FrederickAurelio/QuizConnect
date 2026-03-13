@@ -37,7 +37,7 @@ services:
       PORT: 2000
       MONGODB_URI: mongodb://mongodb:27017/QuizzConnect
       REDIS_URL: redis://redis:6379
-      CORS_ORIGIN: http://localhost
+      CORS_ORIGIN: http://localhost:3221
     env_file:
       - ./backend/.env.local
     depends_on:

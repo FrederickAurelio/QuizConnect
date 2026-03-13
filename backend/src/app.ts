@@ -58,7 +58,8 @@ export const sessionMiddleware = session({
   rolling: true, // This is crucial for constantly renewing the client cookie's
   cookie: {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    // Use secure cookies only when explicitly enabled (e.g. behind HTTPS)
+    secure: process.env.COOKIE_SECURE === "true",
     maxAge: 120000 * 60,
   },
   store: MongoStore.create({
