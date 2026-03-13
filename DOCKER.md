@@ -182,6 +182,7 @@ From the project root:
 
 ```bash
 docker compose up -d mongodb redis
+docker compose -f docker-compose.yml -f docker-compose.dev-db.yml up -d mongodb redis
 ```
 
 MongoDB is on **localhost:27017**, Redis on **localhost:6379**. Data is stored in the same Docker volumes (`mongo_data`, `redis_data`) as when you run the full stack, so you can switch between “full Docker” and “local dev” without losing data.
@@ -241,11 +242,34 @@ We’ll cover:
 
 This is what you already do: Express + Vite on your PC, MongoDB + Redis in Docker.
 
-1. From project root, start only MongoDB + Redis in Docker:
+1. From project root, start only MongoDB + Redis in Docker.
 
-   ```bash
-   docker compose up -d mongodb redis
-   ```
+   - **Normal dev (backend only talks to DBs):**
+
+     ```bash
+     docker compose up -d mongodb redis
+     ```
+
+   - **If you also want to reach Mongo/Redis from host tools (e.g. `mongosh`, GUI client):**
+
+     ```bash
+     docker compose -f docker-compose.yml -f docker-compose.dev-db.yml up -d mongodb redis
+     ```
+
+     The `docker-compose.dev-db.yml` file only adds:
+
+     ```yaml
+     services:
+       mongodb:
+         ports:
+           - "27017:27017"
+
+       redis:
+         ports:
+           - "6379:6379"
+     ```
+
+     so in dev you can hit `mongodb://localhost:27017` and `redis://localhost:6379` directly from your machine.
 
 2. Backend dev:
 
