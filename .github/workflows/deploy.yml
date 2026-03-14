@@ -67,8 +67,9 @@ jobs:
           script_stop: true
           script: |
             set -e
-            cd ~/QuizzConnect
-            git pull origin main
+            cd ~/QuizConnect
+            git fetch origin
+            git reset --hard origin/main
             export IMAGE_BACKEND=ghcr.io/${{ steps.meta.outputs.owner }}/quizgame-backend:latest
             export IMAGE_WEB=ghcr.io/${{ steps.meta.outputs.owner }}/quizgame-web:latest
             docker compose -f docker-compose.yml -f docker-compose.ci.yml pull
