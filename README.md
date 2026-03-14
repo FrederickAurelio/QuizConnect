@@ -6,28 +6,28 @@
 
 ## Features
 
-| Area | What it does |
-|------|----------------|
-| **Quizzes** | Create, edit, and manage quiz sets. Shuffle questions and answers per game. |
-| **Live games** | Host a game with a shareable code; players join and answer in real time. |
-| **Game flow** | Cooldown → Question → Result, with configurable time per question and cooldown. |
-| **Real-time** | Leaderboard, question state, and “everyone answered” skip via Socket.IO. |
-| **State** | Lobby and game state in Redis; game-step timers in BullMQ so they survive deploys/crashes. |
-| **History** | Per-game results and answer breakdown saved to MongoDB; view past games and details. |
-| **Auth** | Sign up / sign in with session cookies; optional email (Brevo). |
+| Area           | What it does                                                                               |
+| -------------- | ------------------------------------------------------------------------------------------ |
+| **Quizzes**    | Create, edit, and manage quiz sets. Shuffle questions and answers per game.                |
+| **Live games** | Host a game with a shareable code; players join and answer in real time.                   |
+| **Game flow**  | Cooldown → Question → Result, with configurable time per question and cooldown.            |
+| **Real-time**  | Leaderboard, question state, and “everyone answered” skip via Socket.IO.                   |
+| **State**      | Lobby and game state in Redis; game-step timers in BullMQ so they survive deploys/crashes. |
+| **History**    | Per-game results and answer breakdown saved to MongoDB; view past games and details.       |
+| **Auth**       | Sign up / sign in with session cookies; optional email (Brevo).                            |
 
 ---
 
 ## Tech stack
 
-| Layer | Tech |
-|-------|------|
-| **Frontend** | React 19, TypeScript, Vite 7, React Router 7, TanStack Query, React Hook Form, Zod |
-| **UI** | Tailwind CSS 4, Radix UI, shadcn-style components, Lucide icons, Sonner toasts |
-| **Backend** | Node.js, Express 5, TypeScript |
-| **Data** | MongoDB (Mongoose) — users, quizzes, history |
-| **Real-time & cache** | Redis — lobby state, players, answers; Socket.IO — live updates |
-| **Jobs** | BullMQ — delayed “next step” and close-lobby cleanup |
+| Layer                 | Tech                                                                               |
+| --------------------- | ---------------------------------------------------------------------------------- |
+| **Frontend**          | React 19, TypeScript, Vite 7, React Router 7, TanStack Query, React Hook Form, Zod |
+| **UI**                | Tailwind CSS 4, Radix UI, shadcn-style components, Lucide icons, Sonner toasts     |
+| **Backend**           | Node.js, Express 5, TypeScript                                                     |
+| **Data**              | MongoDB (Mongoose) — users, quizzes, history                                       |
+| **Real-time & cache** | Redis — lobby state, players, answers; Socket.IO — live updates                    |
+| **Jobs**              | BullMQ — delayed “next step” and close-lobby cleanup                               |
 
 ---
 
@@ -89,7 +89,6 @@
 2. **Backend env**
 
    Copy `backend/.env` to `backend/.env.local` and set at least:
-
    - `SESSION_SECRET` (min 32 chars)
    - `COOKIE_SECRET`
 
@@ -118,30 +117,30 @@
 
 ## Scripts
 
-| Where | Command | Purpose |
-|-------|---------|--------|
-| **backend** | `npm run dev` | Run Express + Socket.IO with tsx watch |
-| **backend** | `npm run build` | Compile TypeScript to `dist/` |
-| **backend** | `npm start` | Run `dist/server.js` (production) |
-| **frontend** | `npm run dev` | Vite dev server on port 3221 |
-| **frontend** | `npm run build` | TypeScript + Vite build for production |
-| **frontend** | `npm run preview` | Preview production build |
+| Where        | Command           | Purpose                                |
+| ------------ | ----------------- | -------------------------------------- |
+| **backend**  | `npm run dev`     | Run Express + Socket.IO with tsx watch |
+| **backend**  | `npm run build`   | Compile TypeScript to `dist/`          |
+| **backend**  | `npm start`       | Run `dist/server.js` (production)      |
+| **frontend** | `npm run dev`     | Vite dev server on port 3221           |
+| **frontend** | `npm run build`   | TypeScript + Vite build for production |
+| **frontend** | `npm run preview` | Preview production build               |
 
 ---
 
 ## Environment (backend)
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `SESSION_SECRET` | Yes | Secret for session signing (min 32 chars) |
-| `COOKIE_SECRET` | Yes | Secret for cookie signing |
-| `PORT` | No | Server port (default `2000`) |
-| `MONGODB_URI` | No | MongoDB connection string (default `mongodb://localhost:27017/QuizzConnect`) |
-| `REDIS_URL` | No | Redis connection string (default `redis://localhost:6379`) |
-| `CORS_ORIGIN` | No | Allowed origin for API/cookies (default `http://localhost:3221`) |
-| `COOKIE_SECURE` | No | Set to `true` when behind HTTPS |
-| `BREVO_API_KEY` | No | Brevo API key for email (e.g. verification) |
-| `SENDER_EMAIL` | No | Sender address for Brevo |
+| Variable         | Required | Description                                                                  |
+| ---------------- | -------- | ---------------------------------------------------------------------------- |
+| `SESSION_SECRET` | Yes      | Secret for session signing (min 32 chars)                                    |
+| `COOKIE_SECRET`  | Yes      | Secret for cookie signing                                                    |
+| `PORT`           | No       | Server port (default `2000`)                                                 |
+| `MONGODB_URI`    | No       | MongoDB connection string (default `mongodb://localhost:27017/QuizzConnect`) |
+| `REDIS_URL`      | No       | Redis connection string (default `redis://localhost:6379`)                   |
+| `CORS_ORIGIN`    | No       | Allowed origin for API/cookies (default `http://localhost:3221`)             |
+| `COOKIE_SECURE`  | No       | Set to `true` when behind HTTPS                                              |
+| `BREVO_API_KEY`  | No       | Brevo API key for email (e.g. verification)                                  |
+| `SENDER_EMAIL`   | No       | Sender address for Brevo                                                     |
 
 ---
 
@@ -170,11 +169,10 @@
 
 ## Docs
 
-| Doc | Contents |
-|-----|----------|
+| Doc                      | Contents                                                |
+| ------------------------ | ------------------------------------------------------- |
 | [DOCKER.md](./DOCKER.md) | Docker install, run, ports, Nginx, and production usage |
-| [DEPLOY.md](./DEPLOY.md) | GitHub Actions, GHCR, VPS secrets, and deploy flow |
-| [backend/docs/LOBBY_TIMERS_BULLMQ.md](./backend/docs/LOBBY_TIMERS_BULLMQ.md) | Why game timers use BullMQ instead of `setTimeout` and how the code works |
+| [DEPLOY.md](./DEPLOY.md) | GitHub Actions, GHCR, VPS secrets, and deploy flow      |
 
 ---
 
