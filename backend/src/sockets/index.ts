@@ -1,6 +1,6 @@
 import type { Server as HttpServer } from "http";
 import { Server } from "socket.io";
-import { setupLobbySocket } from "./lobby-socket.js";
+import { setupLobbySocket, startLobbyTimeoutWorker } from "./lobby-socket.js";
 
 export const setupSocket = (httpServer: HttpServer) => {
   const io = new Server(httpServer, {
@@ -15,6 +15,8 @@ export const setupSocket = (httpServer: HttpServer) => {
   io.on("connection", (socket) => {
     setupLobbySocket(io, socket);
   });
+
+  startLobbyTimeoutWorker(io);
 
   return io;
 };

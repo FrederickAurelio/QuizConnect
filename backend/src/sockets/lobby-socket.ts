@@ -2,6 +2,12 @@ import type { Server, Socket } from "socket.io";
 import Quiz from "../models/Quiz.js";
 import { EXPIRY_SECONDS, redis } from "../redis/index.js";
 import {
+  cancelNextGameFlowJob,
+  scheduleCloseLobbyCleanupJob,
+  scheduleNextGameFlowJob,
+  startLobbyTimerWorker,
+} from "../queues/lobby-timer-queue.js";
+import {
   addPlayer,
   AnswerLog,
   deleteLobbySession,
@@ -40,31 +46,40 @@ export const parseRedisHash = <T = any>(
     ...JSON.parse(json),
   }));
 
-const gameFlowTimers = new Map<string, NodeJS.Timeout>();
-function scheduleNextGameFlow(io: Server, gameCode: string, duration: number) {
-  // clear existing timer
-  const existing = gameFlowTimers.get(gameCode);
-  if (existing) {
-    clearTimeout(existing);
-  }
+let isLobbyWorkerStarted = false;
 
-  const timer = setTimeout(() => {
-    gameFlowTimers.delete(gameCode);
-    handleNextGameFlow(io, gameCode);
-  }, duration);
-
-  gameFlowTimers.set(gameCode, timer);
+async function scheduleNextGameFlow(
+  _io: Server,
+  gameCode: string,
+  duration: number
+) {
+  await scheduleNextGameFlowJob(gameCode, duration);
 }
 
 export function skipGameFlow(io: Server, gameCode: string) {
-  const timer = gameFlowTimers.get(gameCode);
-  if (timer) {
-    clearTimeout(timer);
-    gameFlowTimers.delete(gameCode);
-  }
-
-  handleNextGameFlow(io, gameCode);
+  void (async () => {
+    await cancelNextGameFlowJob(gameCode);
+    await handleNextGameFlow(io, gameCode);
+  })();
 }
+
+export const startLobbyTimeoutWorker = (io: Server) => {
+  if (isLobbyWorkerStarted) return;
+  isLobbyWorkerStarted = true;
+
+  startLobbyTimerWorker(async (job) => {
+    const payload = job.data;
+
+    if (payload.type === "next-game-flow") {
+      await handleNextGameFlow(io, payload.gameCode);
+      return;
+    }
+
+    if (payload.type === "close-lobby-cleanup") {
+      await deleteLobbySession(payload.gameCode, payload.userId, payload.quizId);
+    }
+  });
+};
 
 export const handleNextGameFlow = async (io: Server, gameCode: string) => {
   const [lobby, questions, allPlayers, hostUser] = await Promise.all([
@@ -149,7 +164,7 @@ export const handleNextGameFlow = async (io: Server, gameCode: string) => {
   }
 
   if (lobby.status !== "ended") {
-    scheduleNextGameFlow(io, gameCode, lobby.gameState.duration);
+    await scheduleNextGameFlow(io, gameCode, lobby.gameState.duration);
   } else {
     // -------------- LAYER 1 --------------
     const winnerUser = (emitLobby?.players ?? []).reduce((best, p) => {
@@ -387,9 +402,12 @@ export const setupLobbySocket = (io: Server, socket: Socket) => {
     try {
       io.to(gameCode).emit("kicked", "The host has closed the lobby.");
 
-      setTimeout(async () => {
-        await deleteLobbySession(gameCode, user._id, lobby.quiz._id);
-      }, 400);
+      await scheduleCloseLobbyCleanupJob(
+        gameCode,
+        user._id,
+        lobby.quiz._id,
+        400
+      );
 
       io.in(gameCode).socketsLeave(gameCode);
     } catch (error) {
@@ -620,6 +638,6 @@ export const setupLobbySocket = (io: Server, socket: Socket) => {
     const emitLobby = await getFullLobby(gameCode);
     io.to(gameCode).emit("lobby-updated", emitLobby);
 
-    scheduleNextGameFlow(io, gameCode, lobby.gameState.duration);
+    await scheduleNextGameFlow(io, gameCode, lobby.gameState.duration);
   });
 };

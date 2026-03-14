@@ -62,7 +62,7 @@ function LobbyPageHeader({
       <div className="flex items-center gap-2">
         <div className="flex flex-col items-end">
           <span className="text-primary text-xs leading-tight">CODE</span>
-          <h2 className="text-secondary-foreground text-2xl leading-tight font-bold">
+          <h2 className="text-secondary-foreground text-2xl leading-tight font-bold tracking-wider">
             {gameCode}
           </h2>
         </div>
