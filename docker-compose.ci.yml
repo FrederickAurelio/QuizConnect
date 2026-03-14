@@ -1,0 +1,10 @@
+# Override for CI deploy: use pre-built images from GHCR instead of building.
+# Used with: docker compose -f docker-compose.yml -f docker-compose.ci.yml pull/up
+# Requires IMAGE_BACKEND and IMAGE_WEB set (e.g. by GitHub Actions).
+
+services:
+  app:
+    image: ${IMAGE_BACKEND}
+
+  web:
+    image: ${IMAGE_WEB}

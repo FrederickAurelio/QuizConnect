@@ -405,16 +405,18 @@ Your existing apps on `:80`, `:3000`, `:8080`, etc. keep working exactly as befo
 
 #### 9.2.5 Updating, stopping, and cleaning up
 
-- **Update code & redeploy**:
+- **Update code & redeploy** (manual):
 
   ```bash
   ssh your-user@your-vps-ip
-  cd QuizGame
+  cd ~/QuizzConnect
   git pull
   docker compose up --build -d
   ```
 
   This rebuilds images with the latest code and restarts containers. Data in `mongo_data` and `redis_data` stays.
+
+- **Auto-deploy on push to `main`:** see **DEPLOY.md** for GitHub Actions setup (SSH from runner to VPS, then `git pull` + `docker compose up --build -d`).
 
 - **Stop containers (keep data)**:
 
