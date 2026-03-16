@@ -26,3 +26,5 @@ frontend/dist
 coverage
 .nyc_output
 *.tgz
+
+zdoc
