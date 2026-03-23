@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { useLogin } from "@/contexts/login-context";
 import { handleGeneralError } from "@/lib/axios";
 import { useMutation } from "@tanstack/react-query";
-import { Gamepad2, Globe, JoystickIcon, Plus } from "lucide-react";
+import { Gamepad, Globe, JoystickIcon, Plus } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
@@ -55,7 +55,7 @@ function LandingPage() {
       {/* JOIN */}
       <BackgroundWrapper className="group flex h-full flex-col items-center justify-center gap-6">
         <div className="border-primary text-primary bg-secondary rounded-3xl border p-4 opacity-60 transition-all duration-200 group-hover:p-[17px] group-hover:opacity-100">
-          <Gamepad2 className="size-13 transition-all duration-200 group-hover:size-14" />
+          <Gamepad className="size-13 transition-all duration-200 group-hover:size-14" />
         </div>
         <div className="flex flex-col items-center gap-0">
           <h1 className="text-4xl font-bold">Join Quiz</h1>
