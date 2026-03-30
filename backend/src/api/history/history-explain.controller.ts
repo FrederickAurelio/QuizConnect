@@ -4,8 +4,11 @@ import { z } from "zod";
 import { handleControllerError } from "../../utils/handle-control-error.js";
 import { HistoryDetail, HistoryPlayerResult } from "../../models/History.js";
 import { beginAiExplainLog, logExplain } from "../../utils/ai-explain-log.js";
-import { completeChatJson } from "../../utils/openrouter.js";
-import { searchWebForQuestion } from "../../utils/tavilySearch.js";
+import {
+  completeChatJson,
+  OPENROUTER_WEB_DECIDER_MODEL,
+} from "../../utils/openrouter.js";
+import { searchWebForQuestion, type WebSearchHit } from "../../utils/tavilySearch.js";
 
 // --- Request / validation ---
 
@@ -61,6 +64,113 @@ function isCachedPayload(
   return (
     p.success && typeof o.model === "string" && typeof o.createdAt === "string"
   );
+}
+
+// --- Cost-optimized decision: do we need Tavily web evidence? ---
+
+const webDecisionZ = z.object({
+  needWeb: z.boolean(),
+  reason: z.string().optional(),
+});
+
+type WebDecision = z.infer<typeof webDecisionZ>;
+
+function parseWebDecisionJson(raw: string): WebDecision | null {
+  const trimmed = raw.trim();
+  const jsonMatch = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/);
+  const toParse = jsonMatch ? jsonMatch[1]!.trim() : trimmed;
+  try {
+    const parsed = JSON.parse(toParse) as unknown;
+    const out = webDecisionZ.safeParse(parsed);
+    return out.success ? out.data : null;
+  } catch {
+    return null;
+  }
+}
+
+const WEB_DECIDER_FALLBACK_NEED_WEB =
+  (process.env.OPENROUTER_WEB_DECIDER_FALLBACK_NEED_WEB ?? "false")
+    .toLowerCase() === "true";
+
+async function decideNeedWebSearch(questionText: string | null | undefined): Promise<{
+  needWeb: boolean;
+  reason: string;
+  modelUsed: string;
+  usedMathHeuristic: boolean;
+}> {
+  const trimmedQuestionText = (questionText ?? "").trim();
+
+  const trimmedQuestion = trimmedQuestionText;
+  if (!trimmedQuestion) {
+    return {
+      needWeb: false,
+      reason: "empty question text",
+      modelUsed: "local-heuristic",
+      usedMathHeuristic: false,
+    };
+  }
+
+  const systemPrompt = `You are a cost-aware assistant for a quiz app.
+Decide whether we need real-time web search evidence to answer the question accurately.
+
+Rules:
+- If the question is deterministic math/arithmetic/logic that can be solved without web, set needWeb=false.
+- If the question asks for facts that may not be reliably known or may require citations, set needWeb=true.
+- Cost-aware default: if unsure, choose needWeb=false.
+- Only choose needWeb=true when you think web evidence is genuinely needed for high accuracy.
+
+Output ONLY one JSON object (no markdown) with:
+{"needWeb": boolean, "reason": string}
+`;
+
+  const userContent = JSON.stringify({
+    question: trimmedQuestion.slice(0, 1000),
+  });
+
+  let content: string;
+  let usedModel: string;
+  try {
+    ({ content, model: usedModel } = await completeChatJson({
+      model: OPENROUTER_WEB_DECIDER_MODEL,
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userContent },
+      ],
+    }));
+  } catch (e: any) {
+    logExplain("explain: web decider failed (OpenRouter error)", {
+      message: e?.message ?? String(e),
+      fallbackNeedWeb: WEB_DECIDER_FALLBACK_NEED_WEB,
+    });
+    return {
+      needWeb: WEB_DECIDER_FALLBACK_NEED_WEB,
+      reason: "web decider failed; using fallback",
+      modelUsed: OPENROUTER_WEB_DECIDER_MODEL,
+      usedMathHeuristic: false,
+    };
+  }
+
+  const parsed = parseWebDecisionJson(content);
+  if (parsed) {
+    return {
+      needWeb: parsed.needWeb,
+      reason: parsed.reason ?? "no reason provided",
+      modelUsed: usedModel,
+      usedMathHeuristic: false,
+    };
+  }
+
+  logExplain("explain: web decider failed (invalid JSON)", {
+    contentPreview: content.slice(0, 220),
+    fallbackNeedWeb: WEB_DECIDER_FALLBACK_NEED_WEB,
+  });
+
+  return {
+    needWeb: WEB_DECIDER_FALLBACK_NEED_WEB,
+    reason: "invalid JSON from decider; using fallback",
+    modelUsed: usedModel,
+    usedMathHeuristic: false,
+  };
 }
 
 // --- Host participant rows (aligned with stored optionIndex → A–D) ---
@@ -352,7 +462,25 @@ export const postHistoryQuestionExplain = async (
         .join("\n");
 
       const webQuery = `Question: ${question.question}\n${optionsAsText}`;
-      const webSearchResultsRaw = await searchWebForQuestion(webQuery);
+      const webDecision = await decideNeedWebSearch(question.question ?? "");
+      logExplain("explain: webSearch decision (host)", {
+        needWeb: webDecision.needWeb,
+        reason: webDecision.reason,
+        modelUsed: webDecision.modelUsed,
+        usedMathHeuristic: webDecision.usedMathHeuristic,
+      });
+
+      let webSearchResultsRaw: WebSearchHit[] = [];
+      if (webDecision.needWeb) {
+        logExplain("explain: Tavily fetch enabled (decider)", {
+          webQueryLength: webQuery.length,
+        });
+        webSearchResultsRaw = await searchWebForQuestion(webQuery);
+      } else {
+        logExplain("explain: Tavily skipped (decider)", {
+          reason: webDecision.reason,
+        });
+      }
       const seenUrls = new Set<string>();
       const webSearchResults = webSearchResultsRaw.filter((r) => {
         if (seenUrls.has(r.url)) return false;
@@ -499,11 +627,29 @@ export const postHistoryQuestionExplain = async (
       myAnswer,
     });
 
-    const webSearchResults = await searchWebForQuestion(
-      `Question: ${question.question}\n${(question.options ?? [])
-        .map((opt: any, idx: number) => `Option ${OPTION_INDEX_TO_KEY[idx]}: ${opt.text}`)
-        .join("\n")}`
-    );
+    const webQuery = `Question: ${question.question}\n${(question.options ?? [])
+      .map((opt: any, idx: number) => `Option ${OPTION_INDEX_TO_KEY[idx]}: ${opt.text}`)
+      .join("\n")}`;
+
+    const webDecision = await decideNeedWebSearch(question.question ?? "");
+    logExplain("explain: webSearch decision (player)", {
+      needWeb: webDecision.needWeb,
+      reason: webDecision.reason,
+      modelUsed: webDecision.modelUsed,
+      usedMathHeuristic: webDecision.usedMathHeuristic,
+    });
+
+    let webSearchResults: WebSearchHit[] = [];
+    if (webDecision.needWeb) {
+      logExplain("explain: Tavily fetch enabled (decider)", {
+        webQueryLength: webQuery.length,
+      });
+      webSearchResults = await searchWebForQuestion(webQuery);
+    } else {
+      logExplain("explain: Tavily skipped (decider)", {
+        reason: webDecision.reason,
+      });
+    }
 
     logExplain("explain: player webSearchResults (injected into user JSON)", {
       hitCount: webSearchResults.length,

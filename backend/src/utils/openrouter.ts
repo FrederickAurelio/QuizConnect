@@ -6,8 +6,11 @@ dotenv.config({ path: ".env.local" });
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
-const OPENROUTER_MODEL =
+export const OPENROUTER_MODEL =
   process.env.OPENROUTER_MODEL || "stepfun/step-3.5-flash:free";
+export const OPENROUTER_WEB_DECIDER_MODEL =
+  process.env.OPENROUTER_WEB_DECIDER_MODEL?.trim() ||
+  OPENROUTER_MODEL;
 const OPENROUTER_HTTP_REFERER = process.env.OPENROUTER_HTTP_REFERER || "";
 const OPENROUTER_APP_TITLE = process.env.OPENROUTER_APP_TITLE || "QuizGame";
 
