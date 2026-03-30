@@ -419,7 +419,11 @@ function QuestionPage({
           "border-amber-500/50 bg-amber-500/10 text-amber-600 dark:text-amber-400",
         iconBg: "bg-amber-500",
         icon: <AlarmClock className="size-6" />,
-        title: isAllPlayerAnswered ? "All players answered!" : "Time's Up!",
+        title: isHost
+          ? isAllPlayerAnswered
+            ? "All players answered!"
+            : "Time's Up!"
+          : "Time's Up!",
         desc: isHost
           ? `${resultAnswer ? groupedAnswers[resultAnswer].length : 0} players answer correctly!`
           : "You didn't select an answer in time.",
