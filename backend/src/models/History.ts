@@ -1,6 +1,42 @@
 import mongoose from "mongoose";
 import { questionSchema } from "./Quiz.js";
 
+const aiExplanationSourceSchema = new mongoose.Schema(
+  {
+    title: { type: String, required: true },
+    urlOrNote: { type: String, required: true },
+  },
+  { _id: false }
+);
+
+const aiExplanationPayloadSchema = new mongoose.Schema(
+  {
+    verifiedCorrectKey: {
+      type: String,
+      enum: ["A", "B", "C", "D"],
+      required: true,
+    },
+    agreesWithQuizKey: { type: Boolean, required: true },
+    rationale: { type: String, required: true },
+    feedback: { type: String, required: true },
+    sources: {
+      type: [aiExplanationSourceSchema],
+      default: [],
+    },
+  },
+  { _id: false }
+);
+
+const aiExplanationCacheSchema = new mongoose.Schema(
+  {
+    payload: { type: aiExplanationPayloadSchema, required: true },
+    model: { type: String, required: true },
+    createdAt: { type: String, required: true },
+    schemaVersion: { type: Number, default: 1 },
+  },
+  { _id: false }
+);
+
 const answerLogSchema = new mongoose.Schema(
   {
     questionIndex: {
@@ -22,6 +58,10 @@ const answerLogSchema = new mongoose.Schema(
     },
     answeredAt: {
       type: String,
+    },
+    aiExplanation: {
+      type: aiExplanationCacheSchema,
+      default: undefined,
     },
   },
   { _id: false }
@@ -105,6 +145,21 @@ const historyDetailSchema = new mongoose.Schema(
       cooldown: String,
     },
     sessionCreatedAt: String,
+    hostAiExplanations: {
+      type: [
+        new mongoose.Schema(
+          {
+            questionIndex: { type: Number, required: true },
+            payload: { type: aiExplanationPayloadSchema, required: true },
+            model: { type: String, required: true },
+            createdAt: { type: String, required: true },
+            schemaVersion: { type: Number, default: 1 },
+          },
+          { _id: false }
+        ),
+      ],
+      default: [],
+    },
   },
   { timestamps: true }
 );

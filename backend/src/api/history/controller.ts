@@ -303,31 +303,6 @@ export const getHistoryDetail = async (req: Request, res: Response) => {
     let playersAnswer = null;
 
     if (String(historyData?.host?._id) === String(userId)) {
-      // const allPlayers = await HistoryPlayerResult.find({
-      //   gameId: historyData._id,
-      // })
-      //   .select({
-      //     _id: 0,
-      //     gameId: 0,
-      //     player: 1,
-      //     answers: 1,
-      //     totalScore: 0,
-      //     rank: 0,
-      //   })
-      //   .lean();
-
-      // const count = historyData.quiz.questions.length;
-      // const result: any[][] = Array.from({ length: count }, () => []);
-
-      // allPlayers.forEach((player) => {
-      //   player.answers.forEach((answer) => {
-      //     const index = Number(answer.questionIndex);
-
-      //     if (Number.isInteger(index) && index >= 0 && index < result.length) {
-      //       result[index]!.push(answer);
-      //     }
-      //   });
-      // });
       const allPlayers = await HistoryPlayerResult.aggregate([
         { $match: { gameId: historyData._id } },
         { $unwind: "$answers" },
@@ -374,7 +349,7 @@ export const getHistoryDetail = async (req: Request, res: Response) => {
         .lean();
 
       myAnswer = (myPlayer?.answers ?? []).sort(
-        (a, b) => a.questionIndex - b.questionIndex
+        (a, b) => a.questionIndex - b.questionIndex,
       );
     }
 
