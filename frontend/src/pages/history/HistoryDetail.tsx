@@ -116,6 +116,8 @@ function HistoryDetail() {
 
   const isHost = history.host._id === user?.userId;
   const playerMap = Object.fromEntries(history.players.map((p) => [p._id, p]));
+  const partOfTheGame =
+    isHost || history.players.some((p) => p.userId === user?.userId);
 
   return (
     <div className="scroll-primary flex h-full flex-col items-center gap-2 overflow-x-hidden overflow-y-auto py-10">
@@ -207,7 +209,7 @@ function HistoryDetail() {
           playerMap={playerMap}
           isHost={isHost}
           gameId={gameId}
-          aiExplainEnabled={isAuthenticated}
+          aiExplainEnabled={isAuthenticated && partOfTheGame}
         />
       ))}
     </div>
