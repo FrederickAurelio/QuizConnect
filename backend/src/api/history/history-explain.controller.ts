@@ -124,7 +124,7 @@ Output ONLY one JSON object (no markdown) with:
 `;
 
   const userContent = JSON.stringify({
-    question: trimmedQuestion.slice(0, 1000),
+    question: trimmedQuestion,
   });
 
   let content: string;
