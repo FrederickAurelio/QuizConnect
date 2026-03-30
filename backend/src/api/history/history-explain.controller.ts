@@ -131,9 +131,17 @@ const SYSTEM_PLAYER = `You are an educational tutor for a multiple-choice quiz. 
 
 Rules:
 - Output ONLY one JSON object, no markdown fences, no extra text.
-- Independently verify whether the quiz's marked correct answer is actually correct using your knowledge and the webSearchResults snippets when provided. Set agreesWithQuizKey to true if you agree with the quiz author's correct key, false if you believe it is wrong (explain in rationale).
-- In rationale, explain the topic clearly. In feedback, address this specific learner: whether they were right or wrong relative to the verified answer, and how to reason about similar questions.
-- sources: 1-3 items (title + urlOrNote). If webSearchResults is non-empty, each source should either use a real URL from the webSearchResults (put that URL in urlOrNote and a matching title from the result) or, if you add a non-web note, keep it clearly separate. If webSearchResults is empty, urlOrNote may be a short knowledge note without a URL.
+- If webSearchResults is non-empty, treat it as evidence:
+  - Derive verifiedCorrectKey by mapping the webSearchResults snippets to the provided option texts.
+  - sources: 1-3 items (title + urlOrNote).
+  - sources MUST reference ONLY URLs that exist inside webSearchResults.
+    - For every sources[].urlOrNote that is a URL, copy it verbatim from one of webSearchResults[].url values.
+    - sources[].title must match the title from the same webSearchResults entry.
+- Set agreesWithQuizKey:
+  - Set agreesWithQuizKey=true only when the evidence clearly supports that the quiz's marked correct key matches the verifiedCorrectKey.
+  - If evidence is weak, conflicting, or does not clearly map to a single option, set agreesWithQuizKey=false and explain the uncertainty in rationale.
+- In rationale, explain the topic clearly and reference the evidence you used. In feedback, address this specific learner: whether they were right or wrong relative to the verified answer, and how to reason about similar questions.
+- If webSearchResults is empty, you may answer using prior knowledge, and sources[].urlOrNote may be a short knowledge note.
 
 JSON shape: ${EXPLAIN_JSON_SHAPE}`;
 
@@ -141,9 +149,17 @@ const SYSTEM_HOST = `You are an educational tutor helping a quiz host review one
 
 Rules:
 - Output ONLY one JSON object, no markdown fences, no extra text.
-- Independently verify the marked correct key using your knowledge and webSearchResults when provided. Set agreesWithQuizKey accordingly.
-- In rationale, explain the topic. In feedback, summarize how the group performed: how many did not answer (didAnswer false), distribution of chosenKey among those who did, common misconceptions, all relative to the verified answer.
-- sources: 1-3 items (title + urlOrNote). If webSearchResults is non-empty, prefer citing real URLs from webSearchResults in urlOrNote. If webSearchResults is empty, urlOrNote may be a short knowledge note.
+- If webSearchResults is non-empty, treat it as evidence:
+  - Derive verifiedCorrectKey by mapping the webSearchResults snippets to the provided option texts.
+  - sources: 1-3 items (title + urlOrNote).
+  - sources MUST reference ONLY URLs that exist inside webSearchResults.
+    - For every sources[].urlOrNote that is a URL, copy it verbatim from one of webSearchResults[].url values.
+    - sources[].title must match the title from the same webSearchResults entry.
+- Set agreesWithQuizKey:
+  - Set agreesWithQuizKey=true only when the evidence clearly supports that the quiz's marked correct key matches the verifiedCorrectKey.
+  - If evidence is weak, conflicting, or does not clearly map to a single option, set agreesWithQuizKey=false and explain the uncertainty in rationale.
+- In rationale, explain the topic and reference the evidence you used. In feedback, summarize how the group performed: how many did not answer (didAnswer false), distribution of chosenKey among those who did, common misconceptions, all relative to the verified answer.
+- If webSearchResults is empty, you may answer using prior knowledge, and sources[].urlOrNote may be a short knowledge note.
 
 JSON shape: ${EXPLAIN_JSON_SHAPE}`;
 
@@ -331,9 +347,18 @@ export const postHistoryQuestionExplain = async (
         },
       );
 
-      const webSearchResults = await searchWebForQuestion(
-        question.question ?? "",
-      );
+      const optionsAsText = (question.options ?? [])
+        .map((opt: any, idx: number) => `Option ${OPTION_INDEX_TO_KEY[idx]}: ${opt.text}`)
+        .join("\n");
+
+      const webQuery = `Question: ${question.question}\n${optionsAsText}`;
+      const webSearchResultsRaw = await searchWebForQuestion(webQuery);
+      const seenUrls = new Set<string>();
+      const webSearchResults = webSearchResultsRaw.filter((r) => {
+        if (seenUrls.has(r.url)) return false;
+        seenUrls.add(r.url);
+        return true;
+      });
 
       logExplain("explain: host webSearchResults (injected into user JSON)", {
         hitCount: webSearchResults.length,
@@ -475,7 +500,9 @@ export const postHistoryQuestionExplain = async (
     });
 
     const webSearchResults = await searchWebForQuestion(
-      question.question ?? "",
+      `Question: ${question.question}\n${(question.options ?? [])
+        .map((opt: any, idx: number) => `Option ${OPTION_INDEX_TO_KEY[idx]}: ${opt.text}`)
+        .join("\n")}`
     );
 
     logExplain("explain: player webSearchResults (injected into user JSON)", {

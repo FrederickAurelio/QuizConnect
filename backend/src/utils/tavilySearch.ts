@@ -9,6 +9,7 @@ export type WebSearchHit = {
   title: string;
   url: string;
   snippet: string;
+  score?: number;
 };
 
 /**
@@ -67,8 +68,9 @@ export async function searchWebForQuestion(
         title: (r.title ?? "Result").trim() || "Result",
         url,
         snippet: (r.content ?? "").trim().slice(0, 600),
+        score: typeof (r as any).score === "number" ? (r as any).score : undefined,
       });
-      if (hits.length >= 5) break;
+      if (hits.length >= 3) break;
     }
 
     logExplain("Tavily: results", {
