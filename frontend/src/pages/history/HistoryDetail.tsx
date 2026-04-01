@@ -22,6 +22,8 @@ function QuestionWrapper({
   playerAnswer,
   playerMap,
   isHost,
+  gameId,
+  aiExplainEnabled,
 }: {
   quesionIndex: number;
   curQuestion: Question;
@@ -31,6 +33,8 @@ function QuestionWrapper({
     [k: string]: PlayerSnapshot;
   };
   isHost: boolean;
+  gameId: string;
+  aiExplainEnabled: boolean;
 }) {
   const isAnswered = myAnswer?.key;
 
@@ -69,6 +73,8 @@ function QuestionWrapper({
           isAnswered={isAnswered}
           isHost={isHost}
           groupedAnswers={groupedAnswers}
+          aiExplainEnabled={aiExplainEnabled}
+          historyGameId={gameId}
         />
       </div>
       <hr className="my-8 w-full border-white/10" />
@@ -77,7 +83,7 @@ function QuestionWrapper({
 }
 
 function HistoryDetail() {
-  const { user } = useLogin();
+  const { user, isAuthenticated } = useLogin();
   const { gameId } = useParams();
 
   const historyQuery = useQuery({
@@ -110,6 +116,8 @@ function HistoryDetail() {
 
   const isHost = history.host._id === user?.userId;
   const playerMap = Object.fromEntries(history.players.map((p) => [p._id, p]));
+  const partOfTheGame =
+    isHost || history.players.some((p) => p.userId === user?.userId);
 
   return (
     <div className="scroll-primary flex h-full flex-col items-center gap-2 overflow-x-hidden overflow-y-auto py-10">
@@ -200,6 +208,8 @@ function HistoryDetail() {
           playerAnswer={history?.playersAnswer?.[idx] as AnswerLog[]}
           playerMap={playerMap}
           isHost={isHost}
+          gameId={gameId}
+          aiExplainEnabled={isAuthenticated && partOfTheGame}
         />
       ))}
     </div>

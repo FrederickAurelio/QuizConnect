@@ -3,6 +3,26 @@ import type { UserInfo } from "@/api/sessions";
 import { api } from "@/lib/axios";
 import type { Question } from "@/pages/create-page";
 
+export type AiExplanationPayload = {
+  verifiedCorrectKey: "A" | "B" | "C" | "D";
+  agreesWithQuizKey: boolean;
+  rationale: string;
+  feedback: string;
+  sources: { title: string; urlOrNote: string }[];
+};
+
+export type AiExplanationEnvelope = {
+  payload: AiExplanationPayload;
+  model: string;
+  createdAt: string;
+  schemaVersion: number;
+};
+
+export type PostHistoryExplainResponseData = {
+  explanation: AiExplanationEnvelope;
+  cached: boolean;
+};
+
 type GetHistoriesRequest = ApiRequestQuery & {
   type: "play" | "host";
 };
@@ -102,4 +122,16 @@ export const getHistoryDetail = async (gameId: string) => {
   };
   const resData = { ...res.data, data: data };
   return resData as ApiResponse<HistoryDetail>;
+};
+
+export const postHistoryQuestionExplain = async (
+  gameId: string,
+  body: { questionIndex: number },
+) => {
+  const res = await api.post<ApiResponse<PostHistoryExplainResponseData>>(
+    `/history/${gameId}/explain`,
+    body,
+    { timeout: 120_000 },
+  );
+  return res.data;
 };

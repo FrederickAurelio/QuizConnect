@@ -1,6 +1,13 @@
+import { postHistoryQuestionExplain } from "@/api/history";
 import type { AnswerLog, LobbyState } from "@/api/sessions";
 import { Avatar, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   Tooltip,
   TooltipContent,
@@ -8,12 +15,21 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useLogin } from "@/contexts/login-context";
+import { handleGeneralError } from "@/lib/axios";
 import { socket } from "@/lib/socket";
 import { useGameCountdown } from "@/pages/game-page/useGameCountdown";
+import { useMutation } from "@tanstack/react-query";
 import { AvatarFallback } from "@radix-ui/react-avatar";
 import clsx from "clsx";
-import { AlarmClock, Check, CheckCircle2, XCircle } from "lucide-react";
-import { useMemo, type Dispatch, type SetStateAction } from "react";
+import {
+  AlarmClock,
+  Check,
+  CheckCircle2,
+  Loader2,
+  Sparkles,
+  XCircle,
+} from "lucide-react";
+import { useMemo, useState, type Dispatch, type SetStateAction } from "react";
 
 function TimeHeader({
   startTime,
@@ -44,6 +60,129 @@ function TimeHeader({
   );
 }
 
+function AiExplainControl({
+  gameId,
+  questionIndex,
+}: {
+  gameId: string;
+  questionIndex: number;
+}) {
+  const [open, setOpen] = useState(false);
+  const mutation = useMutation({
+    mutationFn: () => postHistoryQuestionExplain(gameId, { questionIndex }),
+    onError: handleGeneralError,
+  });
+
+  const handleOpenChange = (next: boolean) => {
+    setOpen(next);
+    if (!next) return;
+    if (mutation.isPending) return;
+    if (mutation.data?.data) return;
+    mutation.mutate();
+  };
+
+  const envelope = mutation.data?.data?.explanation;
+
+  return (
+    <Popover open={open} onOpenChange={handleOpenChange}>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="border-primary/30 gap-1.5 text-xs font-semibold"
+        >
+          <Sparkles className="size-3.5" />
+          AI explain
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent
+        align="center"
+        className="border-border scroll-primary max-h-[min(70vh,32rem)] w-[min(100vw-2rem,28rem)] overflow-y-auto"
+      >
+        {mutation.isPending && (
+          <div className="flex items-center gap-2 text-sm text-white/80">
+            <Loader2 className="size-4 shrink-0 animate-spin" />
+            Generating explanation…
+          </div>
+        )}
+        {mutation.isError && (
+          <div className="space-y-3 text-sm">
+            <p className="text-white/70">Could not load the explanation.</p>
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              onClick={() => mutation.mutate()}
+            >
+              Try again
+            </Button>
+          </div>
+        )}
+        {envelope && !mutation.isPending && (
+          <div className="space-y-4 text-left text-sm text-white/90">
+            {mutation.data?.data?.cached && (
+              <p className="text-xs text-white/40">Saved explanation</p>
+            )}
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <span className="rounded-md bg-white/10 px-2 py-0.5">
+                Verified answer: {envelope.payload.verifiedCorrectKey}
+              </span>
+              <span
+                className={clsx(
+                  "rounded-md px-2 py-0.5",
+                  envelope.payload.agreesWithQuizKey
+                    ? "bg-emerald-500/20 text-emerald-200"
+                    : "bg-amber-500/20 text-amber-100",
+                )}
+              >
+                {envelope.payload.agreesWithQuizKey
+                  ? "Matches quiz key"
+                  : "Quiz key may be wrong"}
+              </span>
+            </div>
+            <div>
+              <h3 className="mb-1 text-xs font-bold tracking-wide text-white/50 uppercase">
+                Rationale
+              </h3>
+              <p className="wrap-break-word whitespace-pre-wrap text-white/85">
+                {envelope.payload.rationale}
+              </p>
+            </div>
+            <div>
+              <h3 className="mb-1 text-xs font-bold tracking-wide text-white/50 uppercase">
+                Feedback
+              </h3>
+              <p className="wrap-break-word whitespace-pre-wrap text-white/85">
+                {envelope.payload.feedback}
+              </p>
+            </div>
+            <div>
+              <h3 className="mb-1 text-xs font-bold tracking-wide text-white/50 uppercase">
+                Sources
+              </h3>
+              <ul className="list-inside list-disc space-y-1 text-white/75">
+                {envelope.payload.sources.map((s, i) => (
+                  <li key={i}>
+                    <span className="font-medium wrap-break-word text-white/90">
+                      {s.title}
+                    </span>
+                    <span className="wrap-break-word text-white/50">
+                      {" "}
+                      — {s.urlOrNote}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <p className="text-[10px] text-white/35">Model: {envelope.model}</p>
+          </div>
+        )}
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 type QuestionContentProp = {
   questionIndex: number;
   curQuestion: LobbyState["quiz"]["curQuestion"];
@@ -52,6 +191,9 @@ type QuestionContentProp = {
   isHost: boolean;
   groupedAnswers: GroupedAnswers;
   onAnswerSubmit?: (optionIndex: number, key: "A" | "B" | "C" | "D") => void;
+  /** History review: signed-in users only; requires `historyGameId`. */
+  aiExplainEnabled?: boolean;
+  historyGameId?: string;
 };
 
 export function QuestionContent({
@@ -62,16 +204,26 @@ export function QuestionContent({
   isHost,
   groupedAnswers,
   onAnswerSubmit,
+  aiExplainEnabled = false,
+  historyGameId,
 }: QuestionContentProp) {
   const resultAnswer = isResult ? curQuestion?.correctKey : null;
   const isCorrect = resultAnswer === isAnswered;
 
   return (
     <>
-      <div className="flex flex-col items-center gap-4 text-center">
-        <span className="bg-primary/10 text-primary rounded-full px-4 py-1 text-xs font-black uppercase">
-          Question {questionIndex + 1}
-        </span>
+      <div className="flex w-full flex-col items-center gap-4 text-center">
+        <div className="flex w-full flex-wrap items-center justify-center gap-3">
+          <span className="bg-primary/10 text-primary rounded-full px-4 py-1 text-xs font-black uppercase">
+            Question {questionIndex + 1}
+          </span>
+          {isResult && aiExplainEnabled && historyGameId && (
+            <AiExplainControl
+              gameId={historyGameId}
+              questionIndex={questionIndex}
+            />
+          )}
+        </div>
         <h1 className="balance text-3xl font-extrabold md:text-4xl">
           {curQuestion?.question ?? ""}
         </h1>
@@ -267,7 +419,11 @@ function QuestionPage({
           "border-amber-500/50 bg-amber-500/10 text-amber-600 dark:text-amber-400",
         iconBg: "bg-amber-500",
         icon: <AlarmClock className="size-6" />,
-        title: isAllPlayerAnswered ? "All players answered!" : "Time's Up!",
+        title: isHost
+          ? isAllPlayerAnswered
+            ? "All players answered!"
+            : "Time's Up!"
+          : "Time's Up!",
         desc: isHost
           ? `${resultAnswer ? groupedAnswers[resultAnswer].length : 0} players answer correctly!`
           : "You didn't select an answer in time.",
