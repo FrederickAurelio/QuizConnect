@@ -19,8 +19,11 @@ export type AiExplanationEnvelope = {
 };
 
 export type PostHistoryExplainResponseData = {
-  explanation: AiExplanationEnvelope;
-  cached: boolean;
+  explanation?: AiExplanationEnvelope;
+  cached?: boolean;
+  coalesced?: boolean;
+  status?: "processing";
+  retryAfterMs?: number;
 };
 
 type GetHistoriesRequest = ApiRequestQuery & {
@@ -131,7 +134,10 @@ export const postHistoryQuestionExplain = async (
   const res = await api.post<ApiResponse<PostHistoryExplainResponseData>>(
     `/history/${gameId}/explain`,
     body,
-    { timeout: 120_000 },
+    {
+      timeout: 120_000,
+      validateStatus: (status) => status === 200 || status === 202,
+    },
   );
   return res.data;
 };

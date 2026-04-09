@@ -31,6 +31,27 @@ import {
 } from "lucide-react";
 import { useMemo, useState, type Dispatch, type SetStateAction } from "react";
 
+const MAX_EXPLAIN_POLL_ATTEMPTS = 3;
+const DEFAULT_EXPLAIN_RETRY_MS = 1000;
+
+async function fetchExplainWithRetry(gameId: string, questionIndex: number) {
+  for (let attempt = 0; attempt < MAX_EXPLAIN_POLL_ATTEMPTS; attempt += 1) {
+    const response = await postHistoryQuestionExplain(gameId, {
+      questionIndex,
+    });
+    if (response.data?.status !== "processing") {
+      return response;
+    }
+
+    const retryAfterMs = response.data.retryAfterMs ?? DEFAULT_EXPLAIN_RETRY_MS;
+    await new Promise((resolve) => setTimeout(resolve, retryAfterMs));
+  }
+
+  throw new Error(
+    "Explanation is still generating. Please try again in a moment.",
+  );
+}
+
 function TimeHeader({
   startTime,
   lobbyDuration,
@@ -69,7 +90,7 @@ function AiExplainControl({
 }) {
   const [open, setOpen] = useState(false);
   const mutation = useMutation({
-    mutationFn: () => postHistoryQuestionExplain(gameId, { questionIndex }),
+    mutationFn: () => fetchExplainWithRetry(gameId, questionIndex),
     onError: handleGeneralError,
   });
 
@@ -113,6 +134,7 @@ function AiExplainControl({
               type="button"
               size="sm"
               variant="secondary"
+              disabled={mutation.isPending}
               onClick={() => mutation.mutate()}
             >
               Try again
@@ -261,19 +283,19 @@ export function QuestionContent({
                 </div>
 
                 {selected && !isResult && (
-                  <div className="bg-primary animate-in zoom-in flex size-6 items-center justify-center rounded-full shrink-0">
+                  <div className="bg-primary animate-in zoom-in flex size-6 shrink-0 items-center justify-center rounded-full">
                     <Check strokeWidth={3} className="size-4 text-black" />
                   </div>
                 )}
 
                 {isResult && selected && !isCorrect && (
-                  <div className="bg-destructive/50 animate-in zoom-in flex size-6 items-center justify-center rounded-full shrink-0">
+                  <div className="bg-destructive/50 animate-in zoom-in flex size-6 shrink-0 items-center justify-center rounded-full">
                     <XCircle strokeWidth={3} className="size-4 text-black" />
                   </div>
                 )}
 
                 {isResult && selected && isCorrect && (
-                  <div className="animate-in zoom-in flex size-6 items-center justify-center rounded-full bg-emerald-500/50 shrink-0">
+                  <div className="animate-in zoom-in flex size-6 shrink-0 items-center justify-center rounded-full bg-emerald-500/50">
                     <CheckCircle2
                       strokeWidth={3}
                       className="size-4 text-black"
