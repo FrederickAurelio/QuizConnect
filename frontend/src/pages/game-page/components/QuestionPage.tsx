@@ -254,26 +254,26 @@ export function QuestionContent({
             >
               <div className="flex w-full items-center justify-between">
                 <div className="flex items-center gap-4">
-                  <div className="bg-secondary flex size-10 items-center justify-center rounded-lg font-black">
+                  <div className="bg-secondary flex size-10 items-center rounded-lg font-black">
                     {String.fromCharCode(65 + index)}
                   </div>
                   <span className="text-lg font-bold">{option.text}</span>
                 </div>
 
                 {selected && !isResult && (
-                  <div className="bg-primary animate-in zoom-in flex size-6 items-center justify-center rounded-full">
+                  <div className="bg-primary animate-in zoom-in flex size-6 items-center justify-center rounded-full shrink-0">
                     <Check strokeWidth={3} className="size-4 text-black" />
                   </div>
                 )}
 
                 {isResult && selected && !isCorrect && (
-                  <div className="bg-destructive/50 animate-in zoom-in flex size-6 items-center justify-center rounded-full">
+                  <div className="bg-destructive/50 animate-in zoom-in flex size-6 items-center justify-center rounded-full shrink-0">
                     <XCircle strokeWidth={3} className="size-4 text-black" />
                   </div>
                 )}
 
                 {isResult && selected && isCorrect && (
-                  <div className="animate-in zoom-in flex size-6 items-center justify-center rounded-full bg-emerald-500/50">
+                  <div className="animate-in zoom-in flex size-6 items-center justify-center rounded-full bg-emerald-500/50 shrink-0">
                     <CheckCircle2
                       strokeWidth={3}
                       className="size-4 text-black"
