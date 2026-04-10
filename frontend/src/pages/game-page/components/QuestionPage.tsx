@@ -276,10 +276,12 @@ export function QuestionContent({
             >
               <div className="flex w-full items-center justify-between">
                 <div className="flex items-center gap-4">
-                  <div className="bg-secondary flex size-10 items-center rounded-lg font-black">
+                  <div className="bg-secondary flex size-10 shrink-0 items-center justify-center rounded-lg font-black">
                     {String.fromCharCode(65 + index)}
                   </div>
-                  <span className="text-lg font-bold">{option.text}</span>
+                  <span className="text-left text-lg font-bold">
+                    {option.text}
+                  </span>
                 </div>
 
                 {selected && !isResult && (
