@@ -8,12 +8,25 @@ import {
   completeChatJson,
   OPENROUTER_WEB_DECIDER_MODEL,
 } from "../../utils/openrouter.js";
-import { searchWebForQuestion, type WebSearchHit } from "../../utils/tavilySearch.js";
+import {
+  searchWebForQuestion,
+  type WebSearchHit,
+} from "../../utils/tavilySearch.js";
+import {
+  buildExplainLockKey,
+  EXPLAIN_SINGLEFLIGHT_CONFIG,
+  readHostExplainEnvelopeFromDb,
+  readPlayerExplainEnvelopeFromDb,
+  runExplainSingleFlight,
+  toExplainEnvelope,
+  type ExplainEnvelope,
+} from "./explain-singleflight.js";
 
 // --- Request / validation ---
 
 const explainBodySchema = z.object({
   questionIndex: z.number().int().min(0),
+  viewAs: z.enum(["host", "player"]).optional(),
 });
 
 const explanationSourceZ = z.object({
@@ -89,10 +102,13 @@ function parseWebDecisionJson(raw: string): WebDecision | null {
 }
 
 const WEB_DECIDER_FALLBACK_NEED_WEB =
-  (process.env.OPENROUTER_WEB_DECIDER_FALLBACK_NEED_WEB ?? "false")
-    .toLowerCase() === "true";
+  (
+    process.env.OPENROUTER_WEB_DECIDER_FALLBACK_NEED_WEB ?? "false"
+  ).toLowerCase() === "true";
 
-async function decideNeedWebSearch(questionText: string | null | undefined): Promise<{
+async function decideNeedWebSearch(
+  questionText: string | null | undefined,
+): Promise<{
   needWeb: boolean;
   reason: string;
   modelUsed: string;
@@ -225,9 +241,7 @@ function buildHostParticipantChoicesForQuestion(
       displayName,
       didAnswer: !!ans,
       chosenKey:
-        ans?.optionIndex != null
-          ? OPTION_INDEX_TO_KEY[ans.optionIndex]
-          : null,
+        ans?.optionIndex != null ? OPTION_INDEX_TO_KEY[ans.optionIndex] : null,
       score: ans?.score ?? null,
     };
   });
@@ -339,6 +353,7 @@ export const postHistoryQuestionExplain = async (
 
     const body = explainBodySchema.parse(req.body);
     const questionIndex = body.questionIndex;
+    const viewAs = body.viewAs;
 
     const detail = await HistoryDetail.findById(gameId).lean();
     if (!detail) {
@@ -400,8 +415,9 @@ export const postHistoryQuestionExplain = async (
 
     const hostIdStr = String(detail.host);
     const isHost = hostIdStr === String(userId);
+    const useHostPath = isHost && viewAs !== "player";
 
-    if (isHost) {
+    if (useHostPath) {
       const hostCache = (detail as { hostAiExplanations?: unknown[] })
         .hostAiExplanations;
       const hit = hostCache?.find(
@@ -413,10 +429,7 @@ export const postHistoryQuestionExplain = async (
           message: "AI explanation loaded from cache",
           data: {
             explanation: {
-              payload: hit.payload,
-              model: hit.model,
-              createdAt: hit.createdAt,
-              schemaVersion: (hit as any).schemaVersion ?? 1,
+              ...toExplainEnvelope(hit as any),
             },
             cached: true,
           },
@@ -425,154 +438,173 @@ export const postHistoryQuestionExplain = async (
       }
 
       logExplain("explain: host path — generating (no cache)");
-
-      const playerDocs = await HistoryPlayerResult.find({
-        gameId: detail._id as Types.ObjectId,
-      })
-        .select({ player: 1, answers: 1 })
-        .lean();
-
-      const detailPlayers =
-        (
-          detail as {
-            players?: {
-              userId?: Types.ObjectId | null;
-              guestId?: string | null;
-              username?: string | null;
-            }[];
-          }
-        ).players ?? [];
-
-      const participantChoices = buildHostParticipantChoicesForQuestion(
-        detailPlayers,
-        playerDocs,
+      const lockKey = buildExplainLockKey({
+        gameId,
         questionIndex,
-      );
-
-      logExplain(
-        "explain: host participantChoices (per player, includes didAnswer)",
-        {
-          count: participantChoices.length,
-          participantChoices,
-        },
-      );
-
-      const optionsAsText = (question.options ?? [])
-        .map((opt: any, idx: number) => `Option ${OPTION_INDEX_TO_KEY[idx]}: ${opt.text}`)
-        .join("\n");
-
-      const webQuery = `Question: ${question.question}\n${optionsAsText}`;
-      const webDecision = await decideNeedWebSearch(question.question ?? "");
-      logExplain("explain: webSearch decision (host)", {
-        needWeb: webDecision.needWeb,
-        reason: webDecision.reason,
-        modelUsed: webDecision.modelUsed,
-        usedMathHeuristic: webDecision.usedMathHeuristic,
+        scope: "host",
+        actorId: hostIdStr,
       });
 
-      let webSearchResultsRaw: WebSearchHit[] = [];
-      if (webDecision.needWeb) {
-        logExplain("explain: Tavily fetch enabled (decider)", {
-          webQueryLength: webQuery.length,
-        });
-        webSearchResultsRaw = await searchWebForQuestion(webQuery);
-      } else {
-        logExplain("explain: Tavily skipped (decider)", {
-          reason: webDecision.reason,
-        });
-      }
-      const seenUrls = new Set<string>();
-      const webSearchResults = webSearchResultsRaw.filter((r) => {
-        if (seenUrls.has(r.url)) return false;
-        seenUrls.add(r.url);
-        return true;
-      });
+      const singleFlight = await runExplainSingleFlight<
+        ExplainEnvelope<ExplanationPayload>
+      >({
+        lockKey,
+        lockTtlSeconds: EXPLAIN_SINGLEFLIGHT_CONFIG.lockTtlSeconds,
+        waitTimeoutMs: EXPLAIN_SINGLEFLIGHT_CONFIG.waitTimeoutMs,
+        pollIntervalMs: EXPLAIN_SINGLEFLIGHT_CONFIG.pollIntervalMs,
+        retryAfterMs: EXPLAIN_SINGLEFLIGHT_CONFIG.retryAfterMs,
+        readCurrent: () =>
+          readHostExplainEnvelopeFromDb({
+            gameId,
+            questionIndex,
+            isCachedPayload,
+          }),
+        generateAndPersist: async () => {
+          const playerDocs = await HistoryPlayerResult.find({
+            gameId: detail._id as Types.ObjectId,
+          })
+            .select({ player: 1, answers: 1 })
+            .lean();
 
-      logExplain("explain: host webSearchResults (injected into user JSON)", {
-        hitCount: webSearchResults.length,
-        webSearchResults,
-      });
+          const detailPlayers =
+            (
+              detail as {
+                players?: {
+                  userId?: Types.ObjectId | null;
+                  guestId?: string | null;
+                  username?: string | null;
+                }[];
+              }
+            ).players ?? [];
 
-      const userContent = JSON.stringify(
-        {
-          mode: "host",
-          questionIndex,
-          question: question.question,
-          options: question.options,
-          quizMarkedCorrectKey: quizCorrectKey,
-          participantChoices,
-          webSearchResults,
-        },
-        null,
-        2,
-      );
+          const participantChoices = buildHostParticipantChoicesForQuestion(
+            detailPlayers,
+            playerDocs,
+            questionIndex,
+          );
 
-      logExplain(
-        "explain: host → user message to OpenRouter (string passed as user role content)",
-        userContent,
-      );
+          logExplain(
+            "explain: host participantChoices (per player, includes didAnswer)",
+            {
+              count: participantChoices.length,
+              participantChoices,
+            },
+          );
 
-      let payload: ExplanationPayload;
-      let model: string;
-      try {
-        ({ payload, model } = await requestExplanationPayload(
-          SYSTEM_HOST,
-          userContent,
-        ));
-      } catch (e: any) {
-        if (
-          e?.message === "OPENROUTER_API_KEY environment variable is not set."
-        ) {
-          return res.status(503).json({
-            message: "AI explanation is not configured on the server",
-            data: null,
-            errors: null,
+          const optionsAsText = (question.options ?? [])
+            .map(
+              (opt: any, idx: number) =>
+                `Option ${OPTION_INDEX_TO_KEY[idx]}: ${opt.text}`,
+            )
+            .join("\n");
+
+          const webQuery = `Question: ${question.question}\n${optionsAsText}`;
+          const webDecision = await decideNeedWebSearch(
+            question.question ?? "",
+          );
+          logExplain("explain: webSearch decision (host)", {
+            needWeb: webDecision.needWeb,
+            reason: webDecision.reason,
+            modelUsed: webDecision.modelUsed,
+            usedMathHeuristic: webDecision.usedMathHeuristic,
           });
-        }
-        return res.status(502).json({
-          message:
-            e?.statusCode === 502
-              ? e.message
-              : "Failed to generate AI explanation",
-          data: null,
+
+          let webSearchResultsRaw: WebSearchHit[] = [];
+          if (webDecision.needWeb) {
+            logExplain("explain: Tavily fetch enabled (decider)", {
+              webQueryLength: webQuery.length,
+            });
+            webSearchResultsRaw = await searchWebForQuestion(webQuery);
+          } else {
+            logExplain("explain: Tavily skipped (decider)", {
+              reason: webDecision.reason,
+            });
+          }
+          const seenUrls = new Set<string>();
+          const webSearchResults = webSearchResultsRaw.filter((r) => {
+            if (seenUrls.has(r.url)) return false;
+            seenUrls.add(r.url);
+            return true;
+          });
+
+          logExplain(
+            "explain: host webSearchResults (injected into user JSON)",
+            {
+              hitCount: webSearchResults.length,
+              webSearchResults,
+            },
+          );
+
+          const userContent = JSON.stringify(
+            {
+              mode: "host",
+              questionIndex,
+              question: question.question,
+              options: question.options,
+              quizMarkedCorrectKey: quizCorrectKey,
+              participantChoices,
+              webSearchResults,
+            },
+            null,
+            2,
+          );
+
+          logExplain(
+            "explain: host → user message to OpenRouter (string passed as user role content)",
+            userContent,
+          );
+
+          const { payload, model } = await requestExplanationPayload(
+            SYSTEM_HOST,
+            userContent,
+          );
+
+          const entry = {
+            questionIndex,
+            ...buildCacheEntry(payload, model),
+          };
+
+          const existing = (detail as { hostAiExplanations?: unknown[] })
+            .hostAiExplanations;
+          const next = [
+            ...(existing ?? []).filter(
+              (e: any) => e?.questionIndex !== questionIndex,
+            ),
+            entry,
+          ];
+
+          await HistoryDetail.updateOne(
+            { _id: detail._id },
+            { $set: { hostAiExplanations: next } },
+          );
+
+          logExplain("explain: host done — persisted hostAiExplanations", {
+            questionIndex,
+            model,
+          });
+          return toExplainEnvelope(entry);
+        },
+      });
+
+      if (singleFlight.status === "processing") {
+        return res.status(202).json({
+          message: "Explanation is still being generated",
+          data: {
+            status: "processing",
+            retryAfterMs: singleFlight.retryAfterMs,
+          },
           errors: null,
         });
       }
 
-      const entry = {
-        questionIndex,
-        ...buildCacheEntry(payload, model),
-      };
-
-      const existing = (detail as { hostAiExplanations?: unknown[] })
-        .hostAiExplanations;
-      const next = [
-        ...(existing ?? []).filter(
-          (e: any) => e?.questionIndex !== questionIndex,
-        ),
-        entry,
-      ];
-
-      await HistoryDetail.updateOne(
-        { _id: detail._id },
-        { $set: { hostAiExplanations: next } },
-      );
-
-      logExplain("explain: host done — persisted hostAiExplanations", {
-        questionIndex,
-        model,
-      });
-
       return res.status(200).json({
-        message: "AI explanation generated successfully",
+        message: singleFlight.coalesced
+          ? "AI explanation loaded from in-flight request"
+          : "AI explanation generated successfully",
         data: {
-          explanation: {
-            payload,
-            model,
-            createdAt: entry.createdAt,
-            schemaVersion: entry.schemaVersion,
-          },
+          explanation: singleFlight.data,
           cached: false,
+          coalesced: singleFlight.coalesced,
         },
         errors: null,
       });
@@ -602,10 +634,7 @@ export const postHistoryQuestionExplain = async (
         message: "AI explanation loaded from cache",
         data: {
           explanation: {
-            payload: cachedExplain.payload,
-            model: cachedExplain.model,
-            createdAt: cachedExplain.createdAt,
-            schemaVersion: (cachedExplain as any).schemaVersion ?? 1,
+            ...toExplainEnvelope(cachedExplain as any),
           },
           cached: true,
         },
@@ -614,131 +643,170 @@ export const postHistoryQuestionExplain = async (
     }
 
     logExplain("explain: player path — generating (no cache)");
-    logExplain(
-      "explain: player HistoryPlayerResult answers (full array from DB)",
-      {
-        gameId: String(detail._id),
-        answersCount: playerResult.answers?.length ?? 0,
-        answers: playerResult.answers,
-      },
-    );
-    logExplain("explain: player answer row for this questionIndex", {
+    const lockKey = buildExplainLockKey({
+      gameId,
       questionIndex,
-      myAnswer,
+      scope: "player",
+      actorId: String(userObjectId),
     });
 
-    const webQuery = `Question: ${question.question}\n${(question.options ?? [])
-      .map((opt: any, idx: number) => `Option ${OPTION_INDEX_TO_KEY[idx]}: ${opt.text}`)
-      .join("\n")}`;
-
-    const webDecision = await decideNeedWebSearch(question.question ?? "");
-    logExplain("explain: webSearch decision (player)", {
-      needWeb: webDecision.needWeb,
-      reason: webDecision.reason,
-      modelUsed: webDecision.modelUsed,
-      usedMathHeuristic: webDecision.usedMathHeuristic,
-    });
-
-    let webSearchResults: WebSearchHit[] = [];
-    if (webDecision.needWeb) {
-      logExplain("explain: Tavily fetch enabled (decider)", {
-        webQueryLength: webQuery.length,
-      });
-      webSearchResults = await searchWebForQuestion(webQuery);
-    } else {
-      logExplain("explain: Tavily skipped (decider)", {
-        reason: webDecision.reason,
-      });
-    }
-
-    logExplain("explain: player webSearchResults (injected into user JSON)", {
-      hitCount: webSearchResults.length,
-      webSearchResults,
-    });
-
-    const userContent = JSON.stringify(
-      {
-        mode: "player",
-        questionIndex,
-        question: question.question,
-        options: question.options,
-        quizMarkedCorrectKey: quizCorrectKey,
-        learnerChosenKey:
-          myAnswer?.optionIndex != null
-            ? OPTION_INDEX_TO_KEY[myAnswer.optionIndex]
-            : null,
-        learnerScore: myAnswer?.score ?? null,
-        webSearchResults,
-      },
-      null,
-      2,
-    );
-
-    logExplain(
-      "explain: player → user message to OpenRouter (string passed as user role content)",
-      userContent,
-    );
-
-    let payload: ExplanationPayload;
-    let model: string;
-    try {
-      ({ payload, model } = await requestExplanationPayload(
-        SYSTEM_PLAYER,
-        userContent,
-      ));
-    } catch (e: any) {
-      if (
-        e?.message === "OPENROUTER_API_KEY environment variable is not set."
-      ) {
-        return res.status(503).json({
-          message: "AI explanation is not configured on the server",
-          data: null,
-          errors: null,
+    const singleFlight = await runExplainSingleFlight<
+      ExplainEnvelope<ExplanationPayload>
+    >({
+      lockKey,
+      lockTtlSeconds: EXPLAIN_SINGLEFLIGHT_CONFIG.lockTtlSeconds,
+      waitTimeoutMs: EXPLAIN_SINGLEFLIGHT_CONFIG.waitTimeoutMs,
+      pollIntervalMs: EXPLAIN_SINGLEFLIGHT_CONFIG.pollIntervalMs,
+      retryAfterMs: EXPLAIN_SINGLEFLIGHT_CONFIG.retryAfterMs,
+      readCurrent: () =>
+        readPlayerExplainEnvelopeFromDb({
+          gameId: detail._id as Types.ObjectId,
+          userId: userObjectId,
+          questionIndex,
+          isCachedPayload,
+        }),
+      generateAndPersist: async () => {
+        logExplain(
+          "explain: player HistoryPlayerResult answers (full array from DB)",
+          {
+            gameId: String(detail._id),
+            answersCount: playerResult.answers?.length ?? 0,
+            answers: playerResult.answers,
+          },
+        );
+        logExplain("explain: player answer row for this questionIndex", {
+          questionIndex,
+          myAnswer,
         });
-      }
-      return res.status(502).json({
-        message:
-          e?.statusCode === 502
-            ? e.message
-            : "Failed to generate AI explanation",
-        data: null,
+
+        const webQuery = `Question: ${question.question}\n${(
+          question.options ?? []
+        )
+          .map(
+            (opt: any, idx: number) =>
+              `Option ${OPTION_INDEX_TO_KEY[idx]}: ${opt.text}`,
+          )
+          .join("\n")}`;
+
+        const webDecision = await decideNeedWebSearch(question.question ?? "");
+        logExplain("explain: webSearch decision (player)", {
+          needWeb: webDecision.needWeb,
+          reason: webDecision.reason,
+          modelUsed: webDecision.modelUsed,
+          usedMathHeuristic: webDecision.usedMathHeuristic,
+        });
+
+        let webSearchResults: WebSearchHit[] = [];
+        if (webDecision.needWeb) {
+          logExplain("explain: Tavily fetch enabled (decider)", {
+            webQueryLength: webQuery.length,
+          });
+          webSearchResults = await searchWebForQuestion(webQuery);
+        } else {
+          logExplain("explain: Tavily skipped (decider)", {
+            reason: webDecision.reason,
+          });
+        }
+
+        logExplain(
+          "explain: player webSearchResults (injected into user JSON)",
+          {
+            hitCount: webSearchResults.length,
+            webSearchResults,
+          },
+        );
+
+        const userContent = JSON.stringify(
+          {
+            mode: "player",
+            questionIndex,
+            question: question.question,
+            options: question.options,
+            quizMarkedCorrectKey: quizCorrectKey,
+            learnerChosenKey:
+              myAnswer?.optionIndex != null
+                ? OPTION_INDEX_TO_KEY[myAnswer.optionIndex]
+                : null,
+            learnerScore: myAnswer?.score ?? null,
+            webSearchResults,
+          },
+          null,
+          2,
+        );
+
+        logExplain(
+          "explain: player → user message to OpenRouter (string passed as user role content)",
+          userContent,
+        );
+
+        const { payload, model } = await requestExplanationPayload(
+          SYSTEM_PLAYER,
+          userContent,
+        );
+
+        const cacheDoc = buildCacheEntry(payload, model);
+
+        await HistoryPlayerResult.updateOne(
+          { _id: playerResult._id },
+          {
+            $set: {
+              "answers.$[elem].aiExplanation": cacheDoc,
+            },
+          },
+          {
+            arrayFilters: [{ "elem.questionIndex": questionIndex }],
+          },
+        );
+
+        logExplain("explain: player done — persisted answers[].aiExplanation", {
+          questionIndex,
+          model,
+        });
+
+        return toExplainEnvelope(cacheDoc);
+      },
+    });
+
+    if (singleFlight.status === "processing") {
+      return res.status(202).json({
+        message: "Explanation is still being generated",
+        data: {
+          status: "processing",
+          retryAfterMs: singleFlight.retryAfterMs,
+        },
         errors: null,
       });
     }
 
-    const cacheDoc = buildCacheEntry(payload, model);
-
-    await HistoryPlayerResult.updateOne(
-      { _id: playerResult._id },
-      {
-        $set: {
-          "answers.$[elem].aiExplanation": cacheDoc,
-        },
-      },
-      {
-        arrayFilters: [{ "elem.questionIndex": questionIndex }],
-      },
-    );
-
-    logExplain("explain: player done — persisted answers[].aiExplanation", {
-      questionIndex,
-      model,
-    });
-
     return res.status(200).json({
-      message: "AI explanation generated successfully",
+      message: singleFlight.coalesced
+        ? "AI explanation loaded from in-flight request"
+        : "AI explanation generated successfully",
       data: {
-        explanation: {
-          payload,
-          model,
-          createdAt: cacheDoc.createdAt,
-          schemaVersion: cacheDoc.schemaVersion,
-        },
+        explanation: singleFlight.data,
         cached: false,
+        coalesced: singleFlight.coalesced,
       },
       errors: null,
     });
   } catch (error) {
+    if (
+      error instanceof Error &&
+      error.message === "OPENROUTER_API_KEY environment variable is not set."
+    ) {
+      return res.status(503).json({
+        message: "AI explanation is not configured on the server",
+        data: null,
+        errors: null,
+      });
+    }
+    if ((error as any)?.statusCode === 502) {
+      return res.status(502).json({
+        message: (error as any).message ?? "Failed to generate AI explanation",
+        data: null,
+        errors: null,
+      });
+    }
     logExplain("explain: handler threw", {
       message: error instanceof Error ? error.message : String(error),
       name: error instanceof Error ? error.name : undefined,

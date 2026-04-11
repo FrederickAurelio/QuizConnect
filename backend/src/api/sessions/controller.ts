@@ -77,6 +77,7 @@ export const hostQuiz = async (req: Request, res: Response) => {
           oldLobbyState.quiz.questionCount = quiz.questions.length;
           oldLobbyState.settings.questionCount = quiz.questions.length;
         }
+        oldLobbyState.settings.hostCanPlay = oldLobbyState.settings.hostCanPlay ?? false;
 
         await redis.set(
           `game:${existingGameCode}`,
@@ -113,6 +114,7 @@ export const hostQuiz = async (req: Request, res: Response) => {
         shuffleAnswers: false,
         timePerQuestion: "10",
         cooldown: "5",
+        hostCanPlay: false,
       },
       banned: [],
       status: "lobby",

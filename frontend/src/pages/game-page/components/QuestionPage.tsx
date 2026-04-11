@@ -31,6 +31,32 @@ import {
 } from "lucide-react";
 import { useMemo, useState, type Dispatch, type SetStateAction } from "react";
 
+const MAX_EXPLAIN_POLL_ATTEMPTS = 3;
+const DEFAULT_EXPLAIN_RETRY_MS = 1000;
+
+async function fetchExplainWithRetry(
+  gameId: string,
+  questionIndex: number,
+  viewAs?: "host" | "player",
+) {
+  for (let attempt = 0; attempt < MAX_EXPLAIN_POLL_ATTEMPTS; attempt += 1) {
+    const response = await postHistoryQuestionExplain(gameId, {
+      questionIndex,
+      viewAs,
+    });
+    if (response.data?.status !== "processing") {
+      return response;
+    }
+
+    const retryAfterMs = response.data.retryAfterMs ?? DEFAULT_EXPLAIN_RETRY_MS;
+    await new Promise((resolve) => setTimeout(resolve, retryAfterMs));
+  }
+
+  throw new Error(
+    "Explanation is still generating. Please try again in a moment.",
+  );
+}
+
 function TimeHeader({
   startTime,
   lobbyDuration,
@@ -63,13 +89,15 @@ function TimeHeader({
 function AiExplainControl({
   gameId,
   questionIndex,
+  viewAs,
 }: {
   gameId: string;
   questionIndex: number;
+  viewAs?: "host" | "player";
 }) {
   const [open, setOpen] = useState(false);
   const mutation = useMutation({
-    mutationFn: () => postHistoryQuestionExplain(gameId, { questionIndex }),
+    mutationFn: () => fetchExplainWithRetry(gameId, questionIndex, viewAs),
     onError: handleGeneralError,
   });
 
@@ -113,6 +141,7 @@ function AiExplainControl({
               type="button"
               size="sm"
               variant="secondary"
+              disabled={mutation.isPending}
               onClick={() => mutation.mutate()}
             >
               Try again
@@ -194,6 +223,7 @@ type QuestionContentProp = {
   /** History review: signed-in users only; requires `historyGameId`. */
   aiExplainEnabled?: boolean;
   historyGameId?: string;
+  viewAs?: "host" | "player";
 };
 
 export function QuestionContent({
@@ -206,6 +236,7 @@ export function QuestionContent({
   onAnswerSubmit,
   aiExplainEnabled = false,
   historyGameId,
+  viewAs,
 }: QuestionContentProp) {
   const resultAnswer = isResult ? curQuestion?.correctKey : null;
   const isCorrect = resultAnswer === isAnswered;
@@ -219,8 +250,10 @@ export function QuestionContent({
           </span>
           {isResult && aiExplainEnabled && historyGameId && (
             <AiExplainControl
+              key={viewAs}
               gameId={historyGameId}
               questionIndex={questionIndex}
+              viewAs={viewAs}
             />
           )}
         </div>
@@ -254,26 +287,28 @@ export function QuestionContent({
             >
               <div className="flex w-full items-center justify-between">
                 <div className="flex items-center gap-4">
-                  <div className="bg-secondary flex size-10 items-center justify-center rounded-lg font-black">
+                  <div className="bg-secondary flex size-10 shrink-0 items-center justify-center rounded-lg font-black">
                     {String.fromCharCode(65 + index)}
                   </div>
-                  <span className="text-lg font-bold">{option.text}</span>
+                  <span className="text-left text-lg font-bold">
+                    {option.text}
+                  </span>
                 </div>
 
                 {selected && !isResult && (
-                  <div className="bg-primary animate-in zoom-in flex size-6 items-center justify-center rounded-full">
+                  <div className="bg-primary animate-in zoom-in flex size-6 shrink-0 items-center justify-center rounded-full">
                     <Check strokeWidth={3} className="size-4 text-black" />
                   </div>
                 )}
 
                 {isResult && selected && !isCorrect && (
-                  <div className="bg-destructive/50 animate-in zoom-in flex size-6 items-center justify-center rounded-full">
+                  <div className="bg-destructive/50 animate-in zoom-in flex size-6 shrink-0 items-center justify-center rounded-full">
                     <XCircle strokeWidth={3} className="size-4 text-black" />
                   </div>
                 )}
 
                 {isResult && selected && isCorrect && (
-                  <div className="animate-in zoom-in flex size-6 items-center justify-center rounded-full bg-emerald-500/50">
+                  <div className="animate-in zoom-in flex size-6 shrink-0 items-center justify-center rounded-full bg-emerald-500/50">
                     <CheckCircle2
                       strokeWidth={3}
                       className="size-4 text-black"
@@ -333,6 +368,7 @@ type QuestionPageProps = {
   myAnswer: AnswerLog[] | null | undefined;
   setMyAnswer: Dispatch<SetStateAction<AnswerLog[] | null | undefined>>;
   playersAnswer: AnswerLog[];
+  hostCanPlay?: boolean;
 };
 
 type AddonAnswerLog = AnswerLog & { username: string; avatar: string };
@@ -351,9 +387,12 @@ function QuestionPage({
   myAnswer,
   setMyAnswer,
   playersAnswer,
+  hostCanPlay,
 }: QuestionPageProps) {
   const { user } = useLogin();
   const isHost = user?.userId === host._id;
+  const canAnswer = !isHost || !!hostCanPlay;
+  const canSeeDashboard = isHost && !hostCanPlay;
 
   const questionIndex = gameState.questionIndex;
   const answerForThisQuestion = (myAnswer ?? []).at(questionIndex);
@@ -396,7 +435,7 @@ function QuestionPage({
   }, [playersAnswer, playerMap]);
 
   function onAnswerSubmit(optionIndex: number, key: "A" | "B" | "C" | "D") {
-    if (isHost) return;
+    if (!canAnswer) return;
 
     socket.emit(
       "submit-answer",
@@ -419,12 +458,12 @@ function QuestionPage({
           "border-amber-500/50 bg-amber-500/10 text-amber-600 dark:text-amber-400",
         iconBg: "bg-amber-500",
         icon: <AlarmClock className="size-6" />,
-        title: isHost
+        title: canSeeDashboard
           ? isAllPlayerAnswered
             ? "All players answered!"
             : "Time's Up!"
           : "Time's Up!",
-        desc: isHost
+        desc: canSeeDashboard
           ? `${resultAnswer ? groupedAnswers[resultAnswer].length : 0} players answer correctly!`
           : "You didn't select an answer in time.",
       }
@@ -488,7 +527,7 @@ function QuestionPage({
         curQuestion={curQuestion}
         isAnswered={isAnswered}
         isResult={isResult}
-        isHost={isHost}
+        isHost={canSeeDashboard}
         groupedAnswers={groupedAnswers}
         onAnswerSubmit={onAnswerSubmit}
       />

@@ -12,7 +12,7 @@ import {
 import LoadingPage from "@/pages/loading-page";
 import { useQuery } from "@tanstack/react-query";
 import dayjs from "dayjs";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Navigate, useParams } from "react-router";
 
 function QuestionWrapper({
@@ -24,17 +24,19 @@ function QuestionWrapper({
   isHost,
   gameId,
   aiExplainEnabled,
+  viewAs,
 }: {
   quesionIndex: number;
   curQuestion: Question;
-  myAnswer: AnswerLog;
-  playerAnswer: AnswerLog[];
+  myAnswer?: AnswerLog;
+  playerAnswer?: AnswerLog[];
   playerMap: {
     [k: string]: PlayerSnapshot;
   };
   isHost: boolean;
   gameId: string;
   aiExplainEnabled: boolean;
+  viewAs?: "host" | "player";
 }) {
   const isAnswered = myAnswer?.key;
 
@@ -75,6 +77,7 @@ function QuestionWrapper({
           groupedAnswers={groupedAnswers}
           aiExplainEnabled={aiExplainEnabled}
           historyGameId={gameId}
+          viewAs={viewAs}
         />
       </div>
       <hr className="my-8 w-full border-white/10" />
@@ -95,6 +98,8 @@ function HistoryDetail() {
     refetchOnMount: "always",
     refetchOnWindowFocus: false,
   });
+
+  const [viewMode, setViewMode] = useState<"host" | "player">("host");
 
   const history = historyQuery.data?.data;
 
@@ -118,6 +123,7 @@ function HistoryDetail() {
   const playerMap = Object.fromEntries(history.players.map((p) => [p._id, p]));
   const partOfTheGame =
     isHost || history.players.some((p) => p.userId === user?.userId);
+  const showViewToggle = isHost && !!history.settings?.hostCanPlay;
 
   return (
     <div className="scroll-primary flex h-full flex-col items-center gap-2 overflow-x-hidden overflow-y-auto py-10">
@@ -193,25 +199,70 @@ function HistoryDetail() {
 
       <hr className="my-8 w-full border-white/10" />
 
-      <div className="flex flex-col items-center gap-1 py-5">
-        <h1 className="text-3xl font-bold">Questions</h1>
-        <h2 className="text-sm font-semibold text-white/30">
-          Review each question and your answers
-        </h2>
-      </div>
+      {showViewToggle ? (
+        <div className="mx-auto mb-2 w-full max-w-[850px] px-2 py-5">
+          <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
+            <div className="flex w-full min-w-0 flex-col gap-1 text-center sm:w-auto sm:flex-1 sm:text-left">
+              <h1 className="text-3xl font-bold">Questions</h1>
+              <h2 className="text-sm font-semibold text-white/30">
+                Review each question and your answers
+              </h2>
+            </div>
+            <div className="border-border bg-card flex w-fit shrink-0 items-center justify-center rounded-lg border p-1">
+              {(
+                [
+                  { key: "host", label: "Host" },
+                  { key: "player", label: "Player" },
+                ] as const
+              ).map((tab) => (
+                <div
+                  key={tab.key}
+                  className={`w-16 cursor-default py-1 text-center text-sm font-semibold transition-colors duration-100 ${
+                    viewMode === tab.key
+                      ? "bg-border text-secondary-foreground rounded-md"
+                      : "text-white/40"
+                  }`}
+                  onClick={() => setViewMode(tab.key)}
+                >
+                  {tab.label}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="flex flex-col items-center gap-1 py-5">
+          <h1 className="text-3xl font-bold">Questions</h1>
+          <h2 className="text-sm font-semibold text-white/30">
+            Review each question and your answers
+          </h2>
+        </div>
+      )}
 
-      {history.quiz.questions.map((q, idx) => (
-        <QuestionWrapper
-          quesionIndex={idx}
-          curQuestion={q}
-          myAnswer={history?.myAnswer?.[idx] as AnswerLog}
-          playerAnswer={history?.playersAnswer?.[idx] as AnswerLog[]}
-          playerMap={playerMap}
-          isHost={isHost}
-          gameId={gameId}
-          aiExplainEnabled={isAuthenticated && partOfTheGame}
-        />
-      ))}
+      {history.quiz.questions.map((q, idx) => {
+        const rowMyAnswer = history.myAnswer?.[idx];
+        const rowPlayerAnswer = history.playersAnswer?.[idx];
+
+        const useHostDashboard = showViewToggle ? viewMode === "host" : isHost;
+
+        const myAnswer = useHostDashboard ? undefined : rowMyAnswer;
+        const playerAnswer = useHostDashboard ? rowPlayerAnswer : undefined;
+
+        return (
+          <QuestionWrapper
+            key={idx}
+            quesionIndex={idx}
+            curQuestion={q}
+            myAnswer={myAnswer}
+            playerAnswer={playerAnswer}
+            playerMap={playerMap}
+            isHost={useHostDashboard}
+            gameId={gameId}
+            aiExplainEnabled={isAuthenticated && partOfTheGame}
+            viewAs={showViewToggle ? viewMode : undefined}
+          />
+        );
+      })}
     </div>
   );
 }

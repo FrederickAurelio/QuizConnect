@@ -143,6 +143,7 @@ const historyDetailSchema = new mongoose.Schema(
       shuffleAnswers: Boolean,
       timePerQuestion: String,
       cooldown: String,
+      hostCanPlay: Boolean,
     },
     sessionCreatedAt: String,
     hostAiExplanations: {

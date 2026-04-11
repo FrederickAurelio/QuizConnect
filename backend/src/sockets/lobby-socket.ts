@@ -152,7 +152,7 @@ export const handleNextGameFlow = async (io: Server, gameCode: string) => {
   const emitLobby = await getFullLobby(gameCode);
 
   // after cooldown mode, because this was just set to question
-  if (lobby.gameState.status === "question") {
+  if (lobby.gameState.status === "question" && !lobby.settings.hostCanPlay) {
     const questionKey = `game:answer:answers:${gameCode}:${lobby.gameState.questionIndex}`; // new qIndex
     const rawAnswers = await redis.hGetAll(questionKey);
     const playersAnswer = parseRedisHash(rawAnswers);
@@ -322,7 +322,8 @@ export const setupLobbySocket = (io: Server, socket: Socket) => {
       if (lobby.status === "lobby") {
         if (lobby.host._id === user._id) {
           await saveHostData(gameCode, { ...lobby.host, online: true });
-        } else {
+        }
+        if (lobby.host._id !== user._id || lobby.settings.hostCanPlay) {
           await addPlayer(gameCode, user);
         }
       }
@@ -330,7 +331,7 @@ export const setupLobbySocket = (io: Server, socket: Socket) => {
       const emitLobby = await getFullLobby(gameCode);
       io.to(gameCode).emit("lobby-updated", emitLobby);
 
-      if (user._id === lobby.host._id) {
+      if (user._id === lobby.host._id && !lobby.settings.hostCanPlay) {
         const questionKey = `game:answer:answers:${gameCode}:${lobby.gameState.questionIndex}`;
         const rawAnswers = await redis.hGetAll(questionKey);
         const playersAnswer = parseRedisHash(rawAnswers);
@@ -358,8 +359,21 @@ export const setupLobbySocket = (io: Server, socket: Socket) => {
         message: "Only host can update settings",
       });
 
+    const prevHostCanPlay = lobby.settings.hostCanPlay ?? false;
     lobby.settings = { ...lobby.settings, ...settings };
     await saveLobby(gameCode, lobby);
+
+    const newHostCanPlay = lobby.settings.hostCanPlay ?? false;
+    if (newHostCanPlay && !prevHostCanPlay) {
+      await addPlayer(gameCode, {
+        _id: hostData._id,
+        username: hostData.username,
+        avatar: hostData.avatar,
+        totalScore: 0,
+      } as UserInfo);
+    } else if (!newHostCanPlay && prevHostCanPlay) {
+      await removePlayer(gameCode, hostData._id);
+    }
 
     const emitLobby = await getFullLobby(gameCode);
     io.to(gameCode).emit("lobby-updated", emitLobby);
@@ -500,10 +514,13 @@ export const setupLobbySocket = (io: Server, socket: Socket) => {
 
       const rawAnswers = await redis.hGetAll(questionKey);
       const playersAnswer = parseRedisHash(rawAnswers);
-      io.to(`user:${hostUser?._id}:${gameCode}`).emit(
-        "question-dashboard",
-        playersAnswer
-      );
+
+      if (!lobby.settings.hostCanPlay) {
+        io.to(`user:${hostUser?._id}:${gameCode}`).emit(
+          "question-dashboard",
+          playersAnswer
+        );
+      }
 
       // Check if everyone answered
       const someUnanswered = playersAnswer.some((p) => p.key === null);

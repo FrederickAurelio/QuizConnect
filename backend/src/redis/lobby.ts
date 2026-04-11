@@ -41,6 +41,7 @@ export type GameSettings = {
   shuffleAnswers: boolean;
   timePerQuestion: string;
   cooldown: string;
+  hostCanPlay: boolean;
 };
 
 export type FullLobbyState = {
