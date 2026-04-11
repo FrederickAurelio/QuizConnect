@@ -26,6 +26,7 @@ import {
 
 const explainBodySchema = z.object({
   questionIndex: z.number().int().min(0),
+  viewAs: z.enum(["host", "player"]).optional(),
 });
 
 const explanationSourceZ = z.object({
@@ -352,6 +353,7 @@ export const postHistoryQuestionExplain = async (
 
     const body = explainBodySchema.parse(req.body);
     const questionIndex = body.questionIndex;
+    const viewAs = body.viewAs;
 
     const detail = await HistoryDetail.findById(gameId).lean();
     if (!detail) {
@@ -413,8 +415,9 @@ export const postHistoryQuestionExplain = async (
 
     const hostIdStr = String(detail.host);
     const isHost = hostIdStr === String(userId);
+    const useHostPath = isHost && viewAs !== "player";
 
-    if (isHost) {
+    if (useHostPath) {
       const hostCache = (detail as { hostAiExplanations?: unknown[] })
         .hostAiExplanations;
       const hit = hostCache?.find(

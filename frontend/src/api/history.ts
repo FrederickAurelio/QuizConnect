@@ -84,6 +84,7 @@ export interface HistoryDetailBase {
     shuffleAnswers: boolean;
     timePerQuestion: string;
     cooldown: string;
+    hostCanPlay?: boolean;
   };
   sessionCreatedAt: string;
   createdAt: string;
@@ -100,7 +101,15 @@ export interface HistoryDetailPlayerView extends HistoryDetailBase {
   myAnswer: AnswerLog[];
 }
 
-export type HistoryDetail = HistoryDetailHostView | HistoryDetailPlayerView;
+export interface HistoryDetailHostPlayerView extends HistoryDetailBase {
+  playersAnswer: AnswerLog[][];
+  myAnswer: AnswerLog[];
+}
+
+export type HistoryDetail =
+  | HistoryDetailHostView
+  | HistoryDetailPlayerView
+  | HistoryDetailHostPlayerView;
 
 export const getHistories = async ({
   page = 1,
@@ -129,7 +138,7 @@ export const getHistoryDetail = async (gameId: string) => {
 
 export const postHistoryQuestionExplain = async (
   gameId: string,
-  body: { questionIndex: number },
+  body: { questionIndex: number; viewAs?: "host" | "player" },
 ) => {
   const res = await api.post<ApiResponse<PostHistoryExplainResponseData>>(
     `/history/${gameId}/explain`,
