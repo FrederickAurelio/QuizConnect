@@ -9,8 +9,7 @@ const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 export const OPENROUTER_MODEL =
   process.env.OPENROUTER_MODEL || "stepfun/step-3.5-flash:free";
 export const OPENROUTER_WEB_DECIDER_MODEL =
-  process.env.OPENROUTER_WEB_DECIDER_MODEL?.trim() ||
-  OPENROUTER_MODEL;
+  process.env.OPENROUTER_WEB_DECIDER_MODEL?.trim() || OPENROUTER_MODEL;
 const OPENROUTER_HTTP_REFERER = process.env.OPENROUTER_HTTP_REFERER || "";
 const OPENROUTER_APP_TITLE = process.env.OPENROUTER_APP_TITLE || "QuizGame";
 
@@ -35,7 +34,7 @@ export async function completeChatJson(params: {
   logExplain("OpenRouter: outgoing request", {
     url: OPENROUTER_URL,
     model,
-    response_format: "json_object",
+    // response_format: "json_object",
     messages: params.messages.map((m) => ({
       role: m.role,
       contentLength: m.content.length,
@@ -60,14 +59,14 @@ export async function completeChatJson(params: {
     body: JSON.stringify({
       model,
       messages: params.messages,
-      response_format: { type: "json_object" },
+      // response_format: "json_object",
     }),
   });
 
   if (!res.ok) {
     const text = await res.text();
     throw new Error(
-      `OpenRouter request failed: ${res.status} ${res.statusText} — ${text.slice(0, 500)}`
+      `OpenRouter request failed: ${res.status} ${res.statusText} — ${text.slice(0, 500)}`,
     );
   }
 
