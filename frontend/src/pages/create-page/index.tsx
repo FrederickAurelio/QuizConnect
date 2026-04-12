@@ -188,6 +188,7 @@ function CreatePage({ editMode = false, editData }: Props) {
           editMode={editMode}
           quizId={editData?._id}
           form={form}
+          editData={editData}
         />
       </Form>
     </div>

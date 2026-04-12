@@ -1,4 +1,4 @@
-import { copyQuiz, deleteQuiz, type QuizListItem } from "@/api/quiz";
+import type { QuizListItem } from "@/api/quiz";
 import { hostQuiz } from "@/api/sessions";
 import { Button } from "@/components/ui/button";
 import {
@@ -7,7 +7,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { handleGeneralError, handleGeneralSuccess } from "@/lib/axios";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import {
   CircleQuestionMark,
   Copy,
@@ -23,67 +23,15 @@ import { useNavigate } from "react-router";
 
 type Props = {
   quiz: QuizListItem;
+  onRequestCopy: (quiz: QuizListItem) => void;
+  onRequestDelete: (quiz: QuizListItem) => void;
+  /** True while a library copy or delete is in flight (disables menu actions). */
+  libraryBusy: boolean;
 };
 
-function QuizCard({ quiz }: Props) {
+function QuizCard({ quiz, onRequestCopy, onRequestDelete, libraryBusy }: Props) {
   const navigate = useNavigate();
   const [openMenu, setOpenMenu] = useState(false);
-  const queryClient = useQueryClient();
-
-  const deleteMutation = useMutation({
-    mutationFn: deleteQuiz,
-    onSuccess: (resData) => {
-      handleGeneralSuccess(resData);
-      queryClient.setQueriesData({ queryKey: ["quizzes"] }, (oldData: any) => {
-        if (!oldData) return oldData;
-
-        return {
-          ...oldData,
-          pages: oldData.pages.map((page: any) => ({
-            ...page,
-            data: {
-              ...page.data,
-              data: page.data.data.filter((q: any) => q._id !== quiz._id),
-            },
-          })),
-        };
-      });
-    },
-    onError: handleGeneralError,
-  });
-
-  const copyMutation = useMutation({
-    mutationFn: copyQuiz,
-    onSuccess: (resData) => {
-      setTimeout(() => {
-        handleGeneralSuccess(resData);
-        queryClient.setQueriesData(
-          { queryKey: ["quizzes"] },
-          (oldData: any) => {
-            const newQuiz = resData.data;
-            if (!oldData || !newQuiz) return oldData;
-
-            return {
-              ...oldData,
-              pages: oldData.pages.map((page: any, i: number) => {
-                return {
-                  ...page,
-                  data: {
-                    ...page.data,
-                    data:
-                      i === 0 ? [newQuiz, ...page.data.data] : page.data.data,
-                  },
-                };
-              }),
-            };
-          },
-        );
-        const el = document.getElementById("quiz-set-scroll");
-        el?.scrollTo({ top: 0, behavior: "smooth" });
-      }, 300);
-    },
-    onError: handleGeneralError,
-  });
 
   const hostMutation = useMutation({
     mutationFn: hostQuiz,
@@ -102,14 +50,18 @@ function QuizCard({ quiz }: Props) {
     setOpenMenu(false);
     hostMutation.mutate(quiz._id);
   };
-  const handleDelete = async () => {
+
+  const handleDeleteClick = () => {
     setOpenMenu(false);
-    deleteMutation.mutate(quiz._id);
+    onRequestDelete(quiz);
   };
-  const handleCopy = async () => {
+
+  const handleCopyClick = () => {
     setOpenMenu(false);
-    copyMutation.mutate(quiz._id);
+    onRequestCopy(quiz);
   };
+
+  const busy = libraryBusy || hostMutation.isPending;
 
   return (
     <div
@@ -128,11 +80,7 @@ function QuizCard({ quiz }: Props) {
             <Button
               variant="ghost"
               className="hover:text-primary flex cursor-default items-center justify-start gap-2 p-1 px-2 text-sm"
-              disabled={
-                deleteMutation.isPending ||
-                copyMutation.isPending ||
-                hostMutation.isPending
-              }
+              disabled={busy}
               onClick={handleEdit}
             >
               <Edit2 size={12} />
@@ -141,12 +89,8 @@ function QuizCard({ quiz }: Props) {
             <Button
               variant="ghost"
               className="hover:text-chart-4 flex cursor-default items-center justify-start gap-2 p-1 px-2 text-sm"
-              disabled={
-                deleteMutation.isPending ||
-                copyMutation.isPending ||
-                hostMutation.isPending
-              }
-              onClick={handleCopy}
+              disabled={busy}
+              onClick={handleCopyClick}
             >
               <Copy size={12} />
               Copy
@@ -154,12 +98,8 @@ function QuizCard({ quiz }: Props) {
             <Button
               variant="ghost"
               className="hover:text-destructive flex cursor-default items-center justify-start gap-2 p-1 px-2 text-sm"
-              disabled={
-                deleteMutation.isPending ||
-                copyMutation.isPending ||
-                hostMutation.isPending
-              }
-              onClick={handleDelete}
+              disabled={busy}
+              onClick={handleDeleteClick}
             >
               <Trash2 size={12} />
               Delete
@@ -175,19 +115,33 @@ function QuizCard({ quiz }: Props) {
 
       <div className="border-border flex w-full items-center justify-between border-t px-3 pt-4">
         {quiz.draft ? (
-          <div className="flex items-center gap-1 text-white/50">
-            <Text className="-translate-y-px" size={16} strokeWidth={3} />
-            <p className="text-sm leading-none font-bold">Draft</p>
-            <p className="translate-y-px text-xs font-normal">
-              {quiz.questionCount} Qs
-            </p>
+          <div className="flex flex-col items-start gap-0.5 text-white/50 sm:flex-row sm:items-center sm:gap-2">
+            <div className="flex items-center gap-1">
+              <Text className="-translate-y-px" size={16} strokeWidth={3} />
+              <p className="text-sm leading-none font-bold">Draft</p>
+              <p className="translate-y-px text-xs font-normal">
+                {quiz.questionCount} Qs
+              </p>
+            </div>
+            {quiz.hasQuizDraft && (
+              <p className="translate-y-0.5 text-xs font-semibold text-amber-400/90">
+                Unsaved edits
+              </p>
+            )}
           </div>
         ) : (
-          <div className="flex items-center gap-1 text-white/50">
-            <CircleQuestionMark size={16} strokeWidth={3} />
-            <p className="text-sm leading-none font-bold">
-              {quiz.questionCount} Qs
-            </p>
+          <div className="flex flex-col items-start gap-0.5 text-white/50 sm:flex-row sm:items-center sm:gap-2">
+            <div className="flex items-center gap-1">
+              <CircleQuestionMark size={16} strokeWidth={3} />
+              <p className="text-sm leading-none font-bold">
+                {quiz.questionCount} Qs
+              </p>
+            </div>
+            {quiz.hasQuizDraft && (
+              <p className="translate-y-0.5 text-xs font-semibold text-amber-400/90">
+                Unsaved edits
+              </p>
+            )}
           </div>
         )}
 
