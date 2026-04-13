@@ -13,7 +13,7 @@ type Props = {
 function PlayerBubble({ isHost, isUser, name, avatarUrl, playerId }: Props) {
   const { openProfileEdit } = useEditProfile();
   const handleClickAction = () => {
-    if (isHost) {
+    if (isHost && !isUser) {
       socket.emit("kick-player", playerId);
     } else if (isUser) {
       openProfileEdit();
