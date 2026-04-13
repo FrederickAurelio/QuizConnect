@@ -35,7 +35,7 @@ const explanationSourceZ = z.object({
 });
 
 const explanationPayloadZ = z.object({
-  verifiedCorrectKey: z.enum(["A", "B", "C", "D"]),
+  verifiedCorrectKey: z.enum(["A", "B", "C", "D", "NONE"]),
   agreesWithQuizKey: z.boolean(),
   rationale: z.string().min(1),
   feedback: z.string().min(1),
@@ -249,7 +249,7 @@ function buildHostParticipantChoicesForQuestion(
 
 // --- OpenRouter prompts & request ---
 
-const EXPLAIN_JSON_SHAPE = `{"verifiedCorrectKey":"A"|"B"|"C"|"D","agreesWithQuizKey":boolean,"rationale":string,"feedback":string,"sources":[{"title":string,"urlOrNote":string}]}`;
+const EXPLAIN_JSON_SHAPE = `{"verifiedCorrectKey":"A"|"B"|"C"|"D"|"NONE","agreesWithQuizKey":boolean,"rationale":string,"feedback":string,"sources":[{"title":string,"urlOrNote":string}]}`;
 
 const SYSTEM_PLAYER = `You are an educational tutor for a multiple-choice quiz. You will receive the question, options, the quiz author's marked correct key, the learner's answer, and optionally webSearchResults.
 
@@ -257,11 +257,13 @@ Rules:
 - Output ONLY one JSON object, no markdown fences, no extra text.
 - If webSearchResults is non-empty, treat it as evidence:
   - Derive verifiedCorrectKey by mapping the webSearchResults snippets to the provided option texts.
+  - If none of the provided options is factually correct, set verifiedCorrectKey="NONE" (do NOT force A-D).
   - sources: 1-3 items (title + urlOrNote).
   - sources MUST reference ONLY URLs that exist inside webSearchResults.
     - For every sources[].urlOrNote that is a URL, copy it verbatim from one of webSearchResults[].url values.
     - sources[].title must match the title from the same webSearchResults entry.
 - Set agreesWithQuizKey:
+  - If verifiedCorrectKey="NONE", agreesWithQuizKey MUST be false.
   - Set agreesWithQuizKey=true only when the evidence clearly supports that the quiz's marked correct key matches the verifiedCorrectKey.
   - If evidence is weak, conflicting, or does not clearly map to a single option, set agreesWithQuizKey=false and explain the uncertainty in rationale.
 - In rationale, explain the topic clearly and reference the evidence you used. In feedback, address this specific learner: whether they were right or wrong relative to the verified answer, and how to reason about similar questions.
@@ -275,11 +277,13 @@ Rules:
 - Output ONLY one JSON object, no markdown fences, no extra text.
 - If webSearchResults is non-empty, treat it as evidence:
   - Derive verifiedCorrectKey by mapping the webSearchResults snippets to the provided option texts.
+  - If none of the provided options is factually correct, set verifiedCorrectKey="NONE" (do NOT force A-D).
   - sources: 1-3 items (title + urlOrNote).
   - sources MUST reference ONLY URLs that exist inside webSearchResults.
     - For every sources[].urlOrNote that is a URL, copy it verbatim from one of webSearchResults[].url values.
     - sources[].title must match the title from the same webSearchResults entry.
 - Set agreesWithQuizKey:
+  - If verifiedCorrectKey="NONE", agreesWithQuizKey MUST be false.
   - Set agreesWithQuizKey=true only when the evidence clearly supports that the quiz's marked correct key matches the verifiedCorrectKey.
   - If evidence is weak, conflicting, or does not clearly map to a single option, set agreesWithQuizKey=false and explain the uncertainty in rationale.
 - In rationale, explain the topic and reference the evidence you used. In feedback, summarize how the group performed: how many did not answer (didAnswer false), distribution of chosenKey among those who did, common misconceptions, all relative to the verified answer.

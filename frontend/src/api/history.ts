@@ -4,7 +4,7 @@ import { api } from "@/lib/axios";
 import type { Question } from "@/pages/create-page";
 
 export type AiExplanationPayload = {
-  verifiedCorrectKey: "A" | "B" | "C" | "D";
+  verifiedCorrectKey: "A" | "B" | "C" | "D" | "NONE";
   agreesWithQuizKey: boolean;
   rationale: string;
   feedback: string;

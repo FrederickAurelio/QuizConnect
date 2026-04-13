@@ -6,6 +6,7 @@ import {
   getQuizzes,
   getDetailQuiz,
   copyQuiz,
+  revertDraft,
 } from "./controller.js";
 import { isAuthenticated } from "../auth/controller.js";
 
@@ -17,6 +18,7 @@ quizRouter.delete("/delete/:id", isAuthenticated, deleteQuiz);
 quizRouter.post("/copy/:id", isAuthenticated, copyQuiz);
 
 quizRouter.get("/", isAuthenticated, getQuizzes);
+quizRouter.delete("/draft/:id", isAuthenticated, revertDraft);
 quizRouter.get("/:id", isAuthenticated, getDetailQuiz);
 
 export default quizRouter;

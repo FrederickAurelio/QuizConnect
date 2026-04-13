@@ -13,7 +13,7 @@ import LoadingPage from "@/pages/loading-page";
 import { useQuery } from "@tanstack/react-query";
 import dayjs from "dayjs";
 import { useMemo, useState } from "react";
-import { Navigate, useParams } from "react-router";
+import { Navigate, useParams, useSearchParams } from "react-router";
 
 function QuestionWrapper({
   quesionIndex,
@@ -99,7 +99,10 @@ function HistoryDetail() {
     refetchOnWindowFocus: false,
   });
 
-  const [viewMode, setViewMode] = useState<"host" | "player">("host");
+  const [searchParams] = useSearchParams();
+  const [viewMode, setViewMode] = useState<"host" | "player">(
+    (searchParams.get("viewAs") as "host" | "player" | undefined) ?? "host",
+  );
 
   const history = historyQuery.data?.data;
 

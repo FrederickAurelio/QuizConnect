@@ -45,7 +45,7 @@ function LobbyPage({ lobby }: { lobby: LobbyState }) {
   };
 
   return (
-    <div className="grid h-full w-full grid-cols-3 overflow-x-hidden overflow-y-auto max-sm:flex max-sm:flex-col">
+    <div className="grid h-full w-full grid-cols-3 overflow-x-hidden overflow-y-auto max-sm:flex max-sm:flex-col scroll-primary">
       {/* LEFT */}
       <div className="scroll-primary col-span-2 flex h-full flex-col gap-3 overflow-hidden p-6 max-sm:overflow-y-auto">
         <LobbyPageHeader gameCode={gameCode} quizMetadata={quizMetadata} />

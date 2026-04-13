@@ -110,6 +110,10 @@ function AiExplainControl({
   };
 
   const envelope = mutation.data?.data?.explanation;
+  const verifiedAnswerLabel =
+    envelope?.payload.verifiedCorrectKey === "NONE"
+      ? "No valid option"
+      : envelope?.payload.verifiedCorrectKey;
 
   return (
     <Popover open={open} onOpenChange={handleOpenChange}>
@@ -155,8 +159,13 @@ function AiExplainControl({
             )}
             <div className="flex flex-wrap items-center gap-2 text-xs">
               <span className="rounded-md bg-white/10 px-2 py-0.5">
-                Verified answer: {envelope.payload.verifiedCorrectKey}
+                Verified answer: {verifiedAnswerLabel}
               </span>
+              {envelope.payload.verifiedCorrectKey === "NONE" && (
+                <span className="rounded-md bg-rose-500/20 px-2 py-0.5 text-rose-100">
+                  None of the options is correct
+                </span>
+              )}
               <span
                 className={clsx(
                   "rounded-md px-2 py-0.5",
