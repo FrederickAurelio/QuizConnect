@@ -19,7 +19,6 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Rocket, Undo2 } from "lucide-react";
 import { useState } from "react";
 import type { UseFormReturn } from "react-hook-form";
-import { useNavigate } from "react-router";
 import { toast } from "sonner";
 
 type Props = {
@@ -27,10 +26,20 @@ type Props = {
   editMode: boolean;
   quizId?: string;
   editData?: QuizBackend;
+  navigateAfterSave: (path: string) => void;
+  manualSaveBusyRef: React.RefObject<boolean>;
+  isAutoSaving: boolean;
 };
 
-function CreatePageFooter({ form, editMode, quizId, editData }: Props) {
-  const navigate = useNavigate();
+function CreatePageFooter({
+  form,
+  editMode,
+  quizId,
+  editData,
+  navigateAfterSave,
+  manualSaveBusyRef,
+  isAutoSaving,
+}: Props) {
   const queryClient = useQueryClient();
   const questions = form.watch("questions");
   const [revertOpen, setRevertOpen] = useState(false);
@@ -41,20 +50,32 @@ function CreatePageFooter({ form, editMode, quizId, editData }: Props) {
 
   const updateMutation = useMutation({
     mutationFn: updateQuiz,
+    onMutate: () => {
+      manualSaveBusyRef.current = true;
+    },
     onSuccess: (data) => {
       handleGeneralSuccess(data);
-      navigate("/quiz-set");
+      navigateAfterSave("/quiz-set");
     },
     onError: handleGeneralError,
+    onSettled: () => {
+      manualSaveBusyRef.current = false;
+    },
   });
 
   const createMutation = useMutation({
     mutationFn: createQuiz,
+    onMutate: () => {
+      manualSaveBusyRef.current = true;
+    },
     onSuccess: (data) => {
       handleGeneralSuccess(data);
-      navigate("/quiz-set");
+      navigateAfterSave("/quiz-set");
     },
     onError: handleGeneralError,
+    onSettled: () => {
+      manualSaveBusyRef.current = false;
+    },
   });
 
   const revertMutation = useMutation({
@@ -110,7 +131,8 @@ function CreatePageFooter({ form, editMode, quizId, editData }: Props) {
   const busy =
     createMutation.isPending ||
     updateMutation.isPending ||
-    revertMutation.isPending;
+    revertMutation.isPending ||
+    isAutoSaving;
 
   const confirmRevert = () => {
     if (!quizId) return;

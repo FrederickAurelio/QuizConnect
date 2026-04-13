@@ -125,7 +125,7 @@ function QuizCard({ quiz, onRequestCopy, onRequestDelete, libraryBusy }: Props) 
             </div>
             {quiz.hasQuizDraft && (
               <p className="translate-y-0.5 text-xs font-semibold text-amber-400/90">
-                Unsaved edits
+                Modified
               </p>
             )}
           </div>
@@ -139,7 +139,7 @@ function QuizCard({ quiz, onRequestCopy, onRequestDelete, libraryBusy }: Props) 
             </div>
             {quiz.hasQuizDraft && (
               <p className="translate-y-0.5 text-xs font-semibold text-amber-400/90">
-                Unsaved edits
+                Modified
               </p>
             )}
           </div>
