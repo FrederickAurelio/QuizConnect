@@ -13,7 +13,7 @@ const aiExplanationPayloadSchema = new mongoose.Schema(
   {
     verifiedCorrectKey: {
       type: String,
-      enum: ["A", "B", "C", "D"],
+      enum: ["A", "B", "C", "D", "NONE"],
       required: true,
     },
     agreesWithQuizKey: { type: Boolean, required: true },
