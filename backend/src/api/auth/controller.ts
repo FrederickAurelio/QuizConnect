@@ -8,6 +8,7 @@ import Verify from "../../models/Verify.js";
 import { sendVerificationEmail } from "../../utils/brevo.js";
 import { differenceInSeconds, addMinutes } from "date-fns";
 import { handleControllerError } from "../../utils/handle-control-error.js";
+import { migrateGuestHistoryToUser } from "./migrate-guest-history.service.js";
 
 const registerSchema = z.object({
   username: z.string().min(3).max(50),
@@ -41,6 +42,12 @@ export const registerUser = async (req: Request, res: Response) => {
   try {
     const parsedData = registerSchema.parse(req.body);
     const { username, email, password, verificationCode } = parsedData;
+    const prevGuestId =
+      req.session.type === "guest" &&
+      typeof req.session.userId === "string" &&
+      req.session.userId.startsWith("guest_")
+        ? req.session.userId
+        : null;
 
     const existingUser = await User.findOne({ email });
     if (existingUser) {
@@ -77,6 +84,17 @@ export const registerUser = async (req: Request, res: Response) => {
       avatar: randomAvatarSrc,
     });
     await dbVerificationCode.deleteOne();
+
+    if (prevGuestId) {
+      try {
+        const stats = await migrateGuestHistoryToUser({
+          guestId: prevGuestId,
+          userId: newUser._id,
+        });
+      } catch (migrationError) {
+        // do nothing
+      }
+    }
 
     req.session.userId = newUser._id;
     req.session.type = "auth";
@@ -277,7 +295,7 @@ export const editProfileUser = async (req: Request, res: Response) => {
 export const isAuthenticated = (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   if (req.session?.userId && req.session?.type === "auth") {
     return next();
@@ -382,7 +400,7 @@ export const sendCode = async (req: Request, res: Response) => {
       const now = new Date();
       // calculate when the last code was sent
       const codeSentAt = new Date(
-        existing.verificationCodeExpires.getTime() - 5 * 60 * 1000
+        existing.verificationCodeExpires.getTime() - 5 * 60 * 1000,
       );
       const cooldownEnd = addMinutes(codeSentAt, 2); // 2 min cooldown
 
@@ -398,7 +416,7 @@ export const sendCode = async (req: Request, res: Response) => {
 
     // 2. Generate new verification code
     const verificationCode = Math.floor(
-      100000 + Math.random() * 900000
+      100000 + Math.random() * 900000,
     ).toString();
     const verificationCodeExpires = addMinutes(new Date(), 5); // expires in 5 minutes
 
@@ -406,7 +424,7 @@ export const sendCode = async (req: Request, res: Response) => {
     await Verify.findOneAndUpdate(
       { email },
       { verificationCode, verificationCodeExpires },
-      { upsert: true, new: true }
+      { upsert: true, new: true },
     );
 
     // 4. Send email
