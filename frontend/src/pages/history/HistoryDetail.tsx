@@ -5,6 +5,7 @@ import { useLogin } from "@/contexts/login-context";
 import { handleGeneralError } from "@/lib/axios";
 import type { Question } from "@/pages/create-page";
 import { Leaderboard } from "@/pages/game-page/components/Leaderboard";
+import AiAnalyticsControl from "@/pages/history/components/AiAnalyticsControl";
 import {
   QuestionContent,
   type GroupedAnswers,
@@ -12,7 +13,7 @@ import {
 import LoadingPage from "@/pages/loading-page";
 import { useQuery } from "@tanstack/react-query";
 import dayjs from "dayjs";
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, useParams, useSearchParams } from "react-router";
 
 function QuestionWrapper({
@@ -24,6 +25,7 @@ function QuestionWrapper({
   isHost,
   gameId,
   aiExplainEnabled,
+  aiExplainDisabledReason,
   viewAs,
 }: {
   quesionIndex: number;
@@ -36,6 +38,7 @@ function QuestionWrapper({
   isHost: boolean;
   gameId: string;
   aiExplainEnabled: boolean;
+  aiExplainDisabledReason?: string;
   viewAs?: "host" | "player";
 }) {
   const isAnswered = myAnswer?.key;
@@ -76,6 +79,7 @@ function QuestionWrapper({
           isHost={isHost}
           groupedAnswers={groupedAnswers}
           aiExplainEnabled={aiExplainEnabled}
+          aiExplainDisabledReason={aiExplainDisabledReason}
           historyGameId={gameId}
           viewAs={viewAs}
         />
@@ -103,6 +107,34 @@ function HistoryDetail() {
   const [viewMode, setViewMode] = useState<"host" | "player">(
     (searchParams.get("viewAs") as "host" | "player" | undefined) ?? "host",
   );
+  const [highlightedQuestionIndex, setHighlightedQuestionIndex] = useState<
+    number | null
+  >(null);
+  const evidenceHighlightTimerRef = useRef<ReturnType<
+    typeof setTimeout
+  > | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (evidenceHighlightTimerRef.current) {
+        clearTimeout(evidenceHighlightTimerRef.current);
+      }
+    };
+  }, []);
+
+  const handleEvidenceClick = useCallback((questionIndex: number) => {
+    const target = document.getElementById(`history-question-${questionIndex}`);
+    if (!target) return;
+    target.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (evidenceHighlightTimerRef.current) {
+      clearTimeout(evidenceHighlightTimerRef.current);
+    }
+    setHighlightedQuestionIndex(questionIndex);
+    evidenceHighlightTimerRef.current = setTimeout(() => {
+      setHighlightedQuestionIndex(null);
+      evidenceHighlightTimerRef.current = null;
+    }, 1500);
+  }, []);
 
   const history = historyQuery.data?.data;
 
@@ -126,7 +158,16 @@ function HistoryDetail() {
   const playerMap = Object.fromEntries(history.players.map((p) => [p._id, p]));
   const partOfTheGame =
     isHost || history.players.some((p) => p.userId === user?.userId);
+
+  const aiFeaturesEnabled = isAuthenticated && partOfTheGame;
+  const aiFeatureDisabledReason =
+    isAuthenticated && !partOfTheGame
+      ? "Only the host and players can access AI features."
+      : !isAuthenticated
+        ? "Sign in to use AI explanations and analytics."
+        : undefined;
   const showViewToggle = isHost && !!history.settings?.hostCanPlay;
+  const analyticsView = showViewToggle ? viewMode : isHost ? "host" : "player";
 
   return (
     <div className="scroll-primary flex h-full flex-col items-center gap-2 overflow-x-hidden overflow-y-auto py-10">
@@ -242,6 +283,29 @@ function HistoryDetail() {
         </div>
       )}
 
+      <div className="mx-auto w-full max-w-[850px] px-2 sm:px-3">
+        <div className="bg-card border-border mb-8 rounded-xl border p-3 sm:p-4">
+          <AiAnalyticsControl
+            key={analyticsView}
+            gameId={gameId}
+            viewAs={analyticsView}
+            analyticsAllowed={aiFeaturesEnabled}
+            analyticsDisabledReason={aiFeatureDisabledReason}
+            onEvidenceClick={handleEvidenceClick}
+          >
+            <div>
+              <h2 className="text-lg font-bold text-white/90">
+                AI session analytics
+              </h2>
+              <p className="mt-0.5 text-xs text-white/45 sm:max-w-md">
+                Role-based session summary with evidence links to questions
+                below.
+              </p>
+            </div>
+          </AiAnalyticsControl>
+        </div>
+      </div>
+
       {history.quiz.questions.map((q, idx) => {
         const rowMyAnswer = history.myAnswer?.[idx];
         const rowPlayerAnswer = history.playersAnswer?.[idx];
@@ -252,18 +316,28 @@ function HistoryDetail() {
         const playerAnswer = useHostDashboard ? rowPlayerAnswer : undefined;
 
         return (
-          <QuestionWrapper
+          <div
             key={idx}
-            quesionIndex={idx}
-            curQuestion={q}
-            myAnswer={myAnswer}
-            playerAnswer={playerAnswer}
-            playerMap={playerMap}
-            isHost={useHostDashboard}
-            gameId={gameId}
-            aiExplainEnabled={isAuthenticated && partOfTheGame}
-            viewAs={showViewToggle ? viewMode : undefined}
-          />
+            id={`history-question-${idx}`}
+            className={`w-full max-w-[850px] rounded-xl transition-shadow duration-300 ${
+              highlightedQuestionIndex === idx
+                ? "ring-primary/45 ring-2 ring-offset-2 ring-offset-transparent"
+                : ""
+            }`}
+          >
+            <QuestionWrapper
+              quesionIndex={idx}
+              curQuestion={q}
+              myAnswer={myAnswer}
+              playerAnswer={playerAnswer}
+              playerMap={playerMap}
+              isHost={useHostDashboard}
+              gameId={gameId}
+              aiExplainEnabled={aiFeaturesEnabled}
+              aiExplainDisabledReason={aiFeatureDisabledReason}
+              viewAs={showViewToggle ? viewMode : undefined}
+            />
+          </div>
         );
       })}
     </div>

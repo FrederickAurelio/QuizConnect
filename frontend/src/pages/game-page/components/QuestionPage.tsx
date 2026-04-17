@@ -229,8 +229,10 @@ type QuestionContentProp = {
   isHost: boolean;
   groupedAnswers: GroupedAnswers;
   onAnswerSubmit?: (optionIndex: number, key: "A" | "B" | "C" | "D") => void;
-  /** History review: signed-in users only; requires `historyGameId`. */
+  /** History review: signed-in host or player in this game; requires `historyGameId`. */
   aiExplainEnabled?: boolean;
+  /** When explain is disabled in history, show muted button + tooltip (e.g. not signed in / not in game). */
+  aiExplainDisabledReason?: string;
   historyGameId?: string;
   viewAs?: "host" | "player";
 };
@@ -244,6 +246,7 @@ export function QuestionContent({
   groupedAnswers,
   onAnswerSubmit,
   aiExplainEnabled = false,
+  aiExplainDisabledReason,
   historyGameId,
   viewAs,
 }: QuestionContentProp) {
@@ -257,13 +260,38 @@ export function QuestionContent({
           <span className="bg-primary/10 text-primary rounded-full px-4 py-1 text-xs font-black uppercase">
             Question {questionIndex + 1}
           </span>
-          {isResult && aiExplainEnabled && historyGameId && (
+          {isResult && historyGameId && aiExplainEnabled && (
             <AiExplainControl
               key={viewAs}
               gameId={historyGameId}
               questionIndex={questionIndex}
               viewAs={viewAs}
             />
+          )}
+          {isResult && historyGameId && !aiExplainEnabled && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span
+                  tabIndex={0}
+                  className="focus-visible:ring-ring/50 inline-flex cursor-not-allowed rounded-md outline-none focus-visible:ring-[3px]"
+                >
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled
+                    className="border-primary/30 pointer-events-none gap-1.5 text-xs font-semibold opacity-50"
+                  >
+                    <Sparkles className="size-3.5" />
+                    AI explain
+                  </Button>
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="max-w-xs text-balance">
+                {aiExplainDisabledReason ??
+                  "AI explain is unavailable for this session."}
+              </TooltipContent>
+            </Tooltip>
           )}
         </div>
         <h1 className="balance text-3xl font-extrabold md:text-4xl">
