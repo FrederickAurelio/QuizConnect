@@ -30,6 +30,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { useMemo, useState, type Dispatch, type SetStateAction } from "react";
+import dayjs from "dayjs";
 
 const MAX_EXPLAIN_POLL_ATTEMPTS = 3;
 const DEFAULT_EXPLAIN_RETRY_MS = 1000;
@@ -213,7 +214,14 @@ function AiExplainControl({
                 ))}
               </ul>
             </div>
-            <p className="text-[10px] text-white/35">Model: {envelope.model}</p>
+            <div className="mb-1 flex flex-wrap items-center gap-2 border-t border-white/10 pt-4 pl-0.5 text-xs text-white/50">
+              <span className="truncate">
+                Model: <span className="text-white/70">{envelope.model}</span>
+              </span>
+              <span className="text-white/40">
+                {dayjs(envelope.createdAt).format("MMM D, YYYY h:mm A")}
+              </span>
+            </div>
           </div>
         )}
       </PopoverContent>
