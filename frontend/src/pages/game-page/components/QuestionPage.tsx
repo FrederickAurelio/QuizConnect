@@ -260,6 +260,24 @@ export function QuestionContent({
 }: QuestionContentProp) {
   const resultAnswer = isResult ? curQuestion?.correctKey : null;
   const isCorrect = resultAnswer === isAnswered;
+  const isUnanswered = !isAnswered;
+  const isHistoryPlayerView =
+    isResult && !!historyGameId && viewAs === "player" && !isHost;
+
+  const answerOutcome = isUnanswered
+    ? {
+        label: "Didn't answer",
+        className: "border-amber-500/50 bg-amber-500/10 text-amber-300",
+      }
+    : isCorrect
+      ? {
+          label: "Correct",
+          className: "border-emerald-500/50 bg-emerald-500/10 text-emerald-300",
+        }
+      : {
+          label: "Wrong",
+          className: "border-destructive/50 bg-destructive/10 text-destructive",
+        };
 
   return (
     <>
@@ -301,6 +319,16 @@ export function QuestionContent({
               </TooltipContent>
             </Tooltip>
           )}
+          {isHistoryPlayerView && (
+            <span
+              className={clsx(
+                "rounded-full border px-3 py-1 text-xs font-black uppercase",
+                answerOutcome.className,
+              )}
+            >
+              {answerOutcome.label}
+            </span>
+          )}
         </div>
         <h1 className="balance text-3xl font-extrabold md:text-4xl">
           {curQuestion?.question ?? ""}
@@ -309,6 +337,7 @@ export function QuestionContent({
       <div className="grid w-full grid-cols-1 gap-4 md:grid-cols-2">
         {curQuestion?.options.map((option, index) => {
           const selected = isAnswered === option.key;
+          const isCorrectOption = option.key === resultAnswer;
 
           const buttonClass = clsx(
             "flex flex-col justify-center min-h-[100px] rounded-2xl border-2 p-6 transition-all active:scale-[0.98]",
@@ -317,8 +346,10 @@ export function QuestionContent({
                 ? "border-primary bg-primary/10"
                 : selected && !isCorrect
                   ? "border-destructive/50 bg-destructive/10"
-                  : (selected && isCorrect) || option.key === resultAnswer
-                    ? "border-emerald-500/50 bg-emerald-500/10"
+                  : (selected && isCorrect) || isCorrectOption
+                    ? isUnanswered && !isHost
+                      ? "border-amber-500/50 bg-amber-500/10"
+                      : "border-emerald-500/50 bg-emerald-500/10"
                     : "border-border bg-card opacity-50 grayscale-[0.5]"
               : "bg-primary/10 hover:border-primary/50 hover:bg-secondary/50",
           );
