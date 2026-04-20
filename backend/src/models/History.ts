@@ -37,6 +37,53 @@ const aiExplanationCacheSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const aiAnalyticsInsightSchema = new mongoose.Schema(
+  {
+    title: { type: String, required: true },
+    detail: { type: String, required: true },
+    evidence: {
+      questionIndices: {
+        type: [Number],
+        default: [],
+      },
+    },
+    relatedQuestionIndices: {
+      type: [Number],
+      default: [],
+    },
+  },
+  { _id: false }
+);
+
+const aiAnalyticsPayloadSchema = new mongoose.Schema(
+  {
+    summary: { type: String, required: true },
+    strengths: {
+      type: [aiAnalyticsInsightSchema],
+      default: [],
+    },
+    weaknesses: {
+      type: [aiAnalyticsInsightSchema],
+      default: [],
+    },
+    recommendations: {
+      type: [aiAnalyticsInsightSchema],
+      default: [],
+    },
+  },
+  { _id: false }
+);
+
+const aiAnalyticsCacheSchema = new mongoose.Schema(
+  {
+    payload: { type: aiAnalyticsPayloadSchema, required: true },
+    model: { type: String, required: true },
+    createdAt: { type: String, required: true },
+    schemaVersion: { type: Number, default: 1 },
+  },
+  { _id: false }
+);
+
 const answerLogSchema = new mongoose.Schema(
   {
     questionIndex: {
@@ -161,6 +208,10 @@ const historyDetailSchema = new mongoose.Schema(
       ],
       default: [],
     },
+    hostAiAnalytics: {
+      type: aiAnalyticsCacheSchema,
+      default: undefined,
+    },
   },
   { timestamps: true }
 );
@@ -180,6 +231,10 @@ const historyPlayerResultSchema = new mongoose.Schema({
   answers: {
     type: [answerLogSchema],
     default: [],
+  },
+  aiSessionAnalytics: {
+    type: aiAnalyticsCacheSchema,
+    default: undefined,
   },
 });
 historyPlayerResultSchema.index({

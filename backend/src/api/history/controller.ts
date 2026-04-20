@@ -292,6 +292,7 @@ export const getHistoryDetail = async (req: Request, res: Response) => {
           hostUser: 0,
           playerUsers: 0,
           hostAiExplanations: 0,
+          hostAiAnalytics: 0,
         },
       },
     ]);

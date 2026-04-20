@@ -28,6 +28,19 @@ mongoose
 
 const PORT = Number(process.env.PORT) || 2000;
 const app = express();
+const DEFAULT_SESSION_COOKIE_MAX_AGE_MS = 2 * 24 * 60 * 60 * 1000; // 2 days
+const SESSION_COOKIE_MAX_AGE_MS = Number(
+  process.env.SESSION_COOKIE_MAX_AGE_MS ?? DEFAULT_SESSION_COOKIE_MAX_AGE_MS,
+);
+const DEFAULT_SESSION_STORE_TTL_SECONDS = Math.ceil(
+  SESSION_COOKIE_MAX_AGE_MS / 1000,
+);
+const SESSION_STORE_TTL_SECONDS = Math.max(
+  Number(
+    process.env.SESSION_STORE_TTL_SECONDS ?? DEFAULT_SESSION_STORE_TTL_SECONDS,
+  ),
+  DEFAULT_SESSION_STORE_TTL_SECONDS,
+);
 
 const server = http.createServer(app);
 
@@ -44,7 +57,7 @@ app.use(
       "Pragma",
     ],
     credentials: true,
-  })
+  }),
 );
 
 app.use(express.json());
@@ -60,11 +73,12 @@ export const sessionMiddleware = session({
     httpOnly: true,
     // Use secure cookies only when explicitly enabled (e.g. behind HTTPS)
     secure: process.env.COOKIE_SECURE === "true",
-    maxAge: 120000 * 60,
+    maxAge: SESSION_COOKIE_MAX_AGE_MS,
   },
   store: MongoStore.create({
     client: mongoose.connection.getClient(),
-    ttl: 120 * 60, // 7200 seconds (2 hours)
+    ttl: SESSION_STORE_TTL_SECONDS,
+    // touchAfter throttles DB writes for touch operations; rolling cookie refresh still applies.
     touchAfter: 300,
     // ----------------------------------------
   }),

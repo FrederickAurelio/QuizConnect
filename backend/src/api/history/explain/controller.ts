@@ -1,17 +1,33 @@
 import { Request, Response } from "express";
 import { Types } from "mongoose";
 import { z } from "zod";
-import { handleControllerError } from "../../utils/handle-control-error.js";
-import { HistoryDetail, HistoryPlayerResult } from "../../models/History.js";
-import { beginAiExplainLog, logExplain } from "../../utils/ai-explain-log.js";
+import { HistoryDetail, HistoryPlayerResult } from "../../../models/History.js";
+import {
+  beginAiExplainLog,
+  logExplain,
+} from "../../../utils/ai-explain-log.js";
+import { handleControllerError } from "../../../utils/handle-control-error.js";
 import {
   completeChatJson,
   OPENROUTER_WEB_DECIDER_MODEL,
-} from "../../utils/openrouter.js";
+} from "../../../utils/openrouter.js";
 import {
   searchWebForQuestion,
   type WebSearchHit,
-} from "../../utils/tavilySearch.js";
+} from "../../../utils/tavilySearch.js";
+import {
+  buildAiCacheEntry,
+  handleAiControllerError,
+  isAiCacheEnvelope,
+  isMcqOptionKey,
+  optionKeyFromIndex,
+  parseJsonWithOptionalFence,
+} from "../shared.js";
+import {
+  buildHostParticipantChoicesForQuestion,
+  buildOptionsAsText,
+  normalizeExplainQuestion,
+} from "./facts.js";
 import {
   buildExplainLockKey,
   EXPLAIN_SINGLEFLIGHT_CONFIG,
@@ -20,7 +36,7 @@ import {
   runExplainSingleFlight,
   toExplainEnvelope,
   type ExplainEnvelope,
-} from "./explain-singleflight.js";
+} from "./singleflight.js";
 
 // --- Request / validation ---
 
@@ -47,36 +63,17 @@ type ExplanationPayload = z.infer<typeof explanationPayloadZ>;
 // --- LLM JSON parsing & cache shape ---
 
 function parseExplanationJson(raw: string): ExplanationPayload | null {
-  const trimmed = raw.trim();
-  const jsonMatch = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/);
-  const toParse = jsonMatch ? jsonMatch[1]!.trim() : trimmed;
-  try {
-    const parsed = JSON.parse(toParse) as unknown;
-    const out = explanationPayloadZ.safeParse(parsed);
-    return out.success ? out.data : null;
-  } catch {
-    return null;
-  }
+  return parseJsonWithOptionalFence(raw, explanationPayloadZ);
 }
 
 function buildCacheEntry(payload: ExplanationPayload, model: string) {
-  return {
-    payload,
-    model,
-    createdAt: new Date().toISOString(),
-    schemaVersion: 1,
-  };
+  return buildAiCacheEntry(payload, model);
 }
 
 function isCachedPayload(
   x: unknown,
 ): x is { payload: ExplanationPayload; model: string; createdAt: string } {
-  if (!x || typeof x !== "object") return false;
-  const o = x as Record<string, unknown>;
-  const p = explanationPayloadZ.safeParse(o.payload);
-  return (
-    p.success && typeof o.model === "string" && typeof o.createdAt === "string"
-  );
+  return isAiCacheEnvelope(x, explanationPayloadZ);
 }
 
 // --- Cost-optimized decision: do we need Tavily web evidence? ---
@@ -89,16 +86,7 @@ const webDecisionZ = z.object({
 type WebDecision = z.infer<typeof webDecisionZ>;
 
 function parseWebDecisionJson(raw: string): WebDecision | null {
-  const trimmed = raw.trim();
-  const jsonMatch = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/);
-  const toParse = jsonMatch ? jsonMatch[1]!.trim() : trimmed;
-  try {
-    const parsed = JSON.parse(toParse) as unknown;
-    const out = webDecisionZ.safeParse(parsed);
-    return out.success ? out.data : null;
-  } catch {
-    return null;
-  }
+  return parseJsonWithOptionalFence(raw, webDecisionZ);
 }
 
 const WEB_DECIDER_FALLBACK_NEED_WEB =
@@ -187,64 +175,6 @@ Output ONLY one JSON object (no markdown) with:
     modelUsed: usedModel,
     usedMathHeuristic: false,
   };
-}
-
-// --- Host participant rows (aligned with stored optionIndex → A–D) ---
-
-const OPTION_INDEX_TO_KEY = ["A", "B", "C", "D"] as const;
-
-function displayNameForParticipantId(
-  detailPlayers: {
-    userId?: Types.ObjectId | null;
-    guestId?: string | null;
-    username?: string | null;
-  }[],
-  participantId: Types.ObjectId | string,
-) {
-  const id = String(participantId);
-  const row = detailPlayers.find(
-    (p) => String(p.userId ?? "") === id || String(p.guestId ?? "") === id,
-  );
-  return row?.username ?? "Player";
-}
-
-/** One entry per player; didAnswer false when no answer row for this question. */
-function buildHostParticipantChoicesForQuestion(
-  detailPlayers: {
-    userId?: Types.ObjectId | null;
-    guestId?: string | null;
-    username?: string | null;
-  }[],
-  playerDocs: {
-    player: {
-      userId?: Types.ObjectId | null;
-      guestId?: string | null;
-      username?: string | null;
-    };
-    answers: {
-      questionIndex: number;
-      key?: string | null;
-      score?: number;
-      optionIndex?: number | null;
-    }[];
-  }[],
-  questionIndex: number,
-) {
-  return playerDocs.map((doc) => {
-    const ans = doc.answers.find((a) => a.questionIndex === questionIndex);
-    const pid = doc.player?.userId ?? doc.player?.guestId;
-    const displayName =
-      pid != null
-        ? displayNameForParticipantId(detailPlayers, pid)
-        : (doc.player?.username ?? "Player");
-    return {
-      displayName,
-      didAnswer: !!ans,
-      chosenKey:
-        ans?.optionIndex != null ? OPTION_INDEX_TO_KEY[ans.optionIndex] : null,
-      score: ans?.score ?? null,
-    };
-  });
 }
 
 // --- OpenRouter prompts & request ---
@@ -377,22 +307,7 @@ export const postHistoryQuestionExplain = async (
       });
     }
 
-    const questionUnparsed = questions[questionIndex]!;
-    const quizCorrectKeyIndex = questionUnparsed.options.findIndex(
-      (opt) => opt.key === questionUnparsed.correctKey,
-    );
-
-    const question = {
-      ...questionUnparsed,
-      options: questionUnparsed.options.map((opt, index) => ({
-        ...opt,
-        key: OPTION_INDEX_TO_KEY[index],
-      })),
-      correctKey:
-        quizCorrectKeyIndex !== -1
-          ? OPTION_INDEX_TO_KEY[quizCorrectKeyIndex]
-          : null,
-    };
+    const question = normalizeExplainQuestion(questions[questionIndex]! as any);
     const quizCorrectKey = question.correctKey;
 
     beginAiExplainLog({
@@ -409,7 +324,7 @@ export const postHistoryQuestionExplain = async (
       options: question.options,
     });
 
-    if (!quizCorrectKey || !["A", "B", "C", "D"].includes(quizCorrectKey)) {
+    if (!quizCorrectKey || !isMcqOptionKey(quizCorrectKey)) {
       return res.status(400).json({
         message: "Question has no valid correct key stored",
         data: null,
@@ -495,12 +410,7 @@ export const postHistoryQuestionExplain = async (
             },
           );
 
-          const optionsAsText = (question.options ?? [])
-            .map(
-              (opt: any, idx: number) =>
-                `Option ${OPTION_INDEX_TO_KEY[idx]}: ${opt.text}`,
-            )
-            .join("\n");
+          const optionsAsText = buildOptionsAsText(question.options ?? []);
 
           const webQuery = `Question: ${question.question}\n${optionsAsText}`;
           const webDecision = await decideNeedWebSearch(
@@ -683,14 +593,9 @@ export const postHistoryQuestionExplain = async (
           myAnswer,
         });
 
-        const webQuery = `Question: ${question.question}\n${(
-          question.options ?? []
-        )
-          .map(
-            (opt: any, idx: number) =>
-              `Option ${OPTION_INDEX_TO_KEY[idx]}: ${opt.text}`,
-          )
-          .join("\n")}`;
+        const webQuery = `Question: ${question.question}\n${buildOptionsAsText(
+          question.options ?? [],
+        )}`;
 
         const webDecision = await decideNeedWebSearch(question.question ?? "");
         logExplain("explain: webSearch decision (player)", {
@@ -727,10 +632,7 @@ export const postHistoryQuestionExplain = async (
             question: question.question,
             options: question.options,
             quizMarkedCorrectKey: quizCorrectKey,
-            learnerChosenKey:
-              myAnswer?.optionIndex != null
-                ? OPTION_INDEX_TO_KEY[myAnswer.optionIndex]
-                : null,
+            learnerChosenKey: optionKeyFromIndex(myAnswer?.optionIndex),
             learnerScore: myAnswer?.score ?? null,
             webSearchResults,
           },
@@ -794,22 +696,12 @@ export const postHistoryQuestionExplain = async (
       errors: null,
     });
   } catch (error) {
-    if (
-      error instanceof Error &&
-      error.message === "OPENROUTER_API_KEY environment variable is not set."
-    ) {
-      return res.status(503).json({
-        message: "AI explanation is not configured on the server",
-        data: null,
-        errors: null,
-      });
-    }
-    if ((error as any)?.statusCode === 502) {
-      return res.status(502).json({
-        message: (error as any).message ?? "Failed to generate AI explanation",
-        data: null,
-        errors: null,
-      });
+    const aiError = handleAiControllerError(error, {
+      missingKeyMessage: "AI explanation is not configured on the server",
+      parseFailMessage: "Failed to generate AI explanation",
+    });
+    if (aiError) {
+      return res.status(aiError.status).json(aiError.body);
     }
     logExplain("explain: handler threw", {
       message: error instanceof Error ? error.message : String(error),

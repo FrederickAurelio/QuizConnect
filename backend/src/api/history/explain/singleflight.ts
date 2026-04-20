@@ -2,9 +2,10 @@ import {
   runSingleFlight,
   type RunSingleFlightParams,
   type SingleFlightResult,
-} from "../../utils/singleflight.js";
+} from "../../../utils/singleflight.js";
 import { Types } from "mongoose";
-import { HistoryDetail, HistoryPlayerResult } from "../../models/History.js";
+import { HistoryDetail, HistoryPlayerResult } from "../../../models/History.js";
+import { toAiEnvelope } from "../shared.js";
 
 export type ExplainEnvelope<TPayload> = {
   payload: TPayload;
@@ -32,12 +33,7 @@ export function toExplainEnvelope<TPayload>(x: {
   createdAt: string;
   schemaVersion?: number;
 }): ExplainEnvelope<TPayload> {
-  return {
-    payload: x.payload,
-    model: x.model,
-    createdAt: x.createdAt,
-    schemaVersion: x.schemaVersion ?? 1,
-  };
+  return toAiEnvelope(x);
 }
 
 export async function readHostExplainEnvelopeFromDb<TPayload>(params: {
@@ -55,7 +51,9 @@ export async function readHostExplainEnvelopeFromDb<TPayload>(params: {
     .lean();
   const hostCache = (freshDetail as { hostAiExplanations?: unknown[] } | null)
     ?.hostAiExplanations;
-  const hit = hostCache?.find((e: any) => e?.questionIndex === params.questionIndex);
+  const hit = hostCache?.find(
+    (e: any) => e?.questionIndex === params.questionIndex,
+  );
   return params.isCachedPayload(hit) ? toExplainEnvelope(hit) : null;
 }
 

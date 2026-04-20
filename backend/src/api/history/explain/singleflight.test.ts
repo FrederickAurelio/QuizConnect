@@ -1,10 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {
-  buildExplainLockKey,
-  runExplainSingleFlight,
-} from "./explain-singleflight.js";
-import { redis } from "../../redis/index.js";
+import { buildExplainLockKey, runExplainSingleFlight } from "./singleflight.js";
+import { redis } from "../../../redis/index.js";
 
 type RedisLike = {
   set: (
@@ -12,7 +9,10 @@ type RedisLike = {
     value: string,
     options: { NX: boolean; EX: number },
   ) => Promise<"OK" | null>;
-  eval: (script: string, args: { keys: string[]; arguments: string[] }) => Promise<number>;
+  eval: (
+    script: string,
+    args: { keys: string[]; arguments: string[] },
+  ) => Promise<number>;
 };
 
 const redisMock = redis as unknown as RedisLike;

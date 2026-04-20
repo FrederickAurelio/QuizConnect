@@ -18,8 +18,37 @@ export type AiExplanationEnvelope = {
   schemaVersion: number;
 };
 
+export type AiAnalyticsInsight = {
+  title: string;
+  detail: string;
+  evidence?: { questionIndices: number[] };
+  relatedQuestionIndices?: number[];
+};
+
+export type AiAnalyticsPayload = {
+  summary: string;
+  strengths: AiAnalyticsInsight[];
+  weaknesses: AiAnalyticsInsight[];
+  recommendations: AiAnalyticsInsight[];
+};
+
+export type AiAnalyticsEnvelope = {
+  payload: AiAnalyticsPayload;
+  model: string;
+  createdAt: string;
+  schemaVersion: number;
+};
+
 export type PostHistoryExplainResponseData = {
   explanation?: AiExplanationEnvelope;
+  cached?: boolean;
+  coalesced?: boolean;
+  status?: "processing";
+  retryAfterMs?: number;
+};
+
+export type PostHistoryAnalyticsResponseData = {
+  analytics?: AiAnalyticsEnvelope;
   cached?: boolean;
   coalesced?: boolean;
   status?: "processing";
@@ -142,6 +171,21 @@ export const postHistoryQuestionExplain = async (
 ) => {
   const res = await api.post<ApiResponse<PostHistoryExplainResponseData>>(
     `/history/${gameId}/explain`,
+    body,
+    {
+      timeout: 120_000,
+      validateStatus: (status) => status === 200 || status === 202,
+    },
+  );
+  return res.data;
+};
+
+export const postHistorySessionAnalytics = async (
+  gameId: string,
+  body: { viewAs?: "host" | "player" },
+) => {
+  const res = await api.post<ApiResponse<PostHistoryAnalyticsResponseData>>(
+    `/history/${gameId}/analytics`,
     body,
     {
       timeout: 120_000,
