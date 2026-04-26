@@ -13,10 +13,12 @@ import {
   useMutation,
   useQueryClient,
 } from "@tanstack/react-query";
-import { Loader2 } from "lucide-react";
+import { Loader2, Sparkles } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { throttle } from "throttle-debounce";
 import { useInView } from "react-intersection-observer";
+import { Button } from "@/components/ui/button";
+import { useNavigate } from "react-router";
 
 const tabs: { key: "all" | "draft" | "ready"; label: string }[] = [
   { key: "all", label: "All" },
@@ -25,6 +27,7 @@ const tabs: { key: "all" | "draft" | "ready"; label: string }[] = [
 ];
 
 function QuizSetPage() {
+  const navigate = useNavigate();
   const [option, setOption] = useState<"all" | "draft" | "ready">("all");
   const draftOnly = option === "draft";
   const readyOnly = option === "ready";
@@ -193,20 +196,30 @@ function QuizSetPage() {
           </p>
         </div>
 
-        <div className="border-border bg-card flex items-center rounded-lg border p-1">
-          {tabs.map((tab) => (
-            <div
-              key={tab.key}
-              className={`w-16 cursor-default py-1 text-center text-sm font-semibold transition-colors duration-100 ${
-                option === tab.key
-                  ? "bg-border text-secondary-foreground rounded-md"
-                  : "text-white/40"
-              }`}
-              onClick={() => setOption(tab.key)}
-            >
-              {tab.label}
-            </div>
-          ))}
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            className="h-8 gap-1.5"
+            onClick={() => navigate("/ai-generate")}
+          >
+            <Sparkles className="size-3.5" />
+            AI Generate
+          </Button>
+          <div className="border-border bg-card flex items-center rounded-lg border p-1">
+            {tabs.map((tab) => (
+              <div
+                key={tab.key}
+                className={`w-16 cursor-default py-1 text-center text-sm font-semibold transition-colors duration-100 ${
+                  option === tab.key
+                    ? "bg-border text-secondary-foreground rounded-md"
+                    : "text-white/40"
+                }`}
+                onClick={() => setOption(tab.key)}
+              >
+                {tab.label}
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
