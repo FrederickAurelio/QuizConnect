@@ -1,0 +1,26 @@
+# Deploy by pulling code and building directly on VPS.
+# Secrets: VPS_HOST, SSH_USER, SSH_PRIVATE_KEY.
+
+name: Deploy to VPS
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script_stop: true
+          script: |
+            set -e
+            cd ~/QuizConnect
+            git fetch origin
+            git reset --hard origin/main
+            docker compose -f docker-compose.yml up -d --build
