@@ -1,14 +1,21 @@
 import type { GenerationItem } from "@/api/ai-quiz-generation";
 import { Button } from "@/components/ui/button";
-import { CircleAlert, CircleCheck, Loader2 } from "lucide-react";
+import { CircleAlert, CircleCheck, Loader2, Trash2 } from "lucide-react";
 import dayjs from "dayjs";
 
 type Props = {
   item: GenerationItem;
   onOpenQuiz: (quizId: string) => void;
+  onDelete: (item: GenerationItem) => void;
+  deletePending: boolean;
 };
 
-export default function GenerationHistoryItem({ item, onOpenQuiz }: Props) {
+export default function GenerationHistoryItem({
+  item,
+  onOpenQuiz,
+  onDelete,
+  deletePending,
+}: Props) {
   return (
     <div className="bg-card border-border rounded-xl border p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -53,7 +60,7 @@ export default function GenerationHistoryItem({ item, onOpenQuiz }: Props) {
         <div className="mt-3 border-t border-white/10 pt-3">
           <p className="font-semibold">{item.quizTitle}</p>
           <p className="text-sm text-white/60">{item.quizDescription}</p>
-          <div className="mt-2">
+          <div className="mt-2 flex items-center justify-between gap-2">
             <Button
               type="button"
               size="sm"
@@ -61,6 +68,18 @@ export default function GenerationHistoryItem({ item, onOpenQuiz }: Props) {
               className="h-8"
             >
               Open in Edit
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={() => onDelete(item)}
+              className="h-8 w-8 p-0 text-red-300 hover:bg-red-500/15 hover:text-red-200"
+              disabled={deletePending}
+              aria-label="Delete generation history"
+              title="Delete generation history"
+            >
+              <Trash2 className="size-4" />
             </Button>
           </div>
         </div>
@@ -74,6 +93,20 @@ export default function GenerationHistoryItem({ item, onOpenQuiz }: Props) {
           <p className="mt-2 text-xs text-white/50">
             Prepare a new file and start again if you want another attempt.
           </p>
+          <div className="mt-2 flex justify-end">
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={() => onDelete(item)}
+              className="h-8 w-8 p-0 text-red-300 hover:bg-red-500/15 hover:text-red-200"
+              disabled={deletePending}
+              aria-label="Delete generation history"
+              title="Delete generation history"
+            >
+              <Trash2 className="size-4" />
+            </Button>
+          </div>
         </div>
       )}
     </div>

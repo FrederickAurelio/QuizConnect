@@ -14,6 +14,8 @@ import sessionRouter from "./api/sessions/router.js";
 import { setupSocket } from "./sockets/index.js";
 import historyRouter from "./api/history/router.js";
 import aiQuizMaterialsRouter from "./api/ai-quiz-materials/router.js";
+import aiQuizGenerationsRouter from "./api/ai-quiz-generations/router.js";
+import { startAiQuizGenerationWorker } from "./queues/ai-quiz-generation-queue.js";
 
 // Local dev: load from .env.local. In Docker, env vars come from docker-compose (no file).
 dotenv.config({ path: ".env.local" });
@@ -127,7 +129,10 @@ apiRouter.use("/quiz", quizRouter);
 apiRouter.use("/sessions", sessionRouter);
 apiRouter.use("/history", historyRouter);
 apiRouter.use("/ai-quiz-materials", aiQuizMaterialsRouter);
+apiRouter.use("/ai-quiz-generations", aiQuizGenerationsRouter);
 app.use("/api", apiRouter);
+
+startAiQuizGenerationWorker();
 
 // Centralized error handling middleware
 app.use((err: Error, req: Request, res: Response, next: NextFunction) => {

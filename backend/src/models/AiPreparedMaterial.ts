@@ -19,7 +19,23 @@ const aiPreparedMaterialSchema = new mongoose.Schema(
       enum: ALLOWED_MIME,
     },
     fileSizeBytes: { type: Number, required: true, min: 1 },
-    cleanText: { type: String, required: true },
+    cleanTexts: {
+      type: [String],
+      required: true,
+      validate: {
+        validator(value: unknown) {
+          return (
+            Array.isArray(value) &&
+            value.length > 0 &&
+            value.every(
+              (chunk) => typeof chunk === "string" && chunk.trim().length > 0,
+            )
+          );
+        },
+        message:
+          "Prepared material must contain at least one non-empty text chunk.",
+      },
+    },
     rawCharCount: { type: Number, required: true, min: 0 },
     cleanCharCount: { type: Number, required: true, min: 0 },
     status: {

@@ -1,9 +1,8 @@
 import {
   createGeneration,
+  deleteGeneration,
   getGenerationDetail,
   listGenerations,
-} from "@/api/ai-quiz-generation.mock";
-import {
   deletePreparedMaterial,
   prepareMaterial,
   type GenerationItem,
@@ -128,15 +127,10 @@ export default function AiQuizGenerationPage() {
 
   const createGenerationMutation = useMutation({
     mutationFn: createGeneration,
-    onSuccess: (created, variables) => {
+    onSuccess: (created) => {
       queryClient.setQueryData(["ai-quiz-generations"], (old: GenerationItem[]) => {
         return [created, ...(old ?? [])];
       });
-      for (const id of variables.preparedFileIds) {
-        void deletePreparedMaterial(id).catch(() => {
-          /* Best-effort cleanup */
-        });
-      }
       setPromptText("");
       setSettings({ ...DEFAULT_AI_SETTINGS });
       setPreparedMaterials([]);
@@ -150,6 +144,21 @@ export default function AiQuizGenerationPage() {
     onError: (err) =>
       toast.error(
         err instanceof Error ? err.message : "Could not start generation.",
+      ),
+  });
+
+  const deleteGenerationMutation = useMutation({
+    mutationFn: (generationId: string) => deleteGeneration(generationId),
+    onSuccess: (_data, generationId) => {
+      queryClient.setQueryData(["ai-quiz-generations"], (old: GenerationItem[]) => {
+        if (!old) return old;
+        return old.filter((item) => item.generationId !== generationId);
+      });
+      toast.success("Generation history deleted.");
+    },
+    onError: (err) =>
+      toast.error(
+        err instanceof Error ? err.message : "Could not delete generation history.",
       ),
   });
 
@@ -208,8 +217,8 @@ export default function AiQuizGenerationPage() {
             <div>
               <h1 className="text-xl font-bold">AI Quiz Generation</h1>
               <p className="text-sm text-white/55">
-                Upload up to 3 materials, set rules, then generate quiz drafts. Material
-                upload uses the server; generation is still mocked.
+                Upload up to 3 materials, set rules, then generate quiz drafts on the
+                server.
               </p>
             </div>
           </div>
@@ -271,6 +280,10 @@ export default function AiQuizGenerationPage() {
         <GenerationHistoryList
           items={generations}
           onOpenQuiz={(quizId) => navigate(`/edit/${quizId}`)}
+          onDelete={async (generationId) =>
+            deleteGenerationMutation.mutateAsync(generationId)
+          }
+          deletePending={deleteGenerationMutation.isPending}
         />
       </section>
     </div>

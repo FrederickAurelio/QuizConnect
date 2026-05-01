@@ -1,4 +1,4 @@
-/** Max questions per AI generation (UI + localStorage / mock). */
+/** Max questions per AI generation (UI + localStorage draft). */
 export const MAX_QUESTION_COUNT = 50;
 
 /** Question count is chosen in steps of 5 (5, 10, …, 50). */

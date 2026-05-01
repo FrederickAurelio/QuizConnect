@@ -3,6 +3,7 @@ import { Types } from "mongoose";
 import AiPreparedMaterial from "../../models/AiPreparedMaterial.js";
 import { handleControllerError } from "../../utils/handle-control-error.js";
 import {
+  chunkMaterialText,
   cleanMaterialText,
   extractPlainTextFromUpload,
   type AllowedMime,
@@ -78,6 +79,7 @@ export const prepareMaterial = async (req: Request, res: Response) => {
     });
     const { text: cleanText, rawCharCount, cleanCharCount } =
       cleanMaterialText(rawText);
+    const cleanTexts = chunkMaterialText(cleanText);
 
     const expiresAt = new Date(Date.now() + TTL_MS);
     const doc = await AiPreparedMaterial.create({
@@ -85,7 +87,7 @@ export const prepareMaterial = async (req: Request, res: Response) => {
       originalFileName: file.originalname || "upload",
       mimeType,
       fileSizeBytes: file.size,
-      cleanText,
+      cleanTexts,
       rawCharCount,
       cleanCharCount,
       status: "READY",

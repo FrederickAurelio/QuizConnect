@@ -209,9 +209,21 @@ function stripUnsafeControls(s: string): string {
   return out;
 }
 
-/** `--- Page N ---` glued to following text on same line → force newline after marker. */
+/**
+ * Put `--- Page N ---` on its own line.
+ * PDF layout often glues the closing dashes to the next token (`--Proceedings`)
+ * or drops the final `-` before a word; fix that before the generic glue case.
+ */
 function ensurePageMarkersOnOwnLine(text: string): string {
-  return text.replace(/(--- Page \d+ ---)(?=[^\r\n\s])/g, "$1\n");
+  let s = text;
+  // Truncated closing run: "--- Page N --Word" (third `-` merged into next word)
+  s = s.replace(
+    /(--- Page (\d+) --)(?=[A-Za-z\u00C0-\u024F\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7af])/g,
+    "--- Page $2 ---\n",
+  );
+  // Full marker immediately followed by non-whitespace on the same line
+  s = s.replace(/(--- Page \d+ ---)(?=[^\r\n\s])/g, "$1\n");
+  return s;
 }
 
 /**
@@ -284,6 +296,334 @@ export function cleanMaterialText(raw: string): {
     );
   }
   return { text, rawCharCount, cleanCharCount };
+}
+
+function readPositiveIntEnv(name: string, fallback: number): number {
+  const raw = process.env[name];
+  if (raw === undefined || raw === "") return fallback;
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return fallback;
+  const i = Math.floor(n);
+  return i > 0 ? i : fallback;
+}
+
+/**
+ * Chunk sizing for quiz material (UTF‑16 code units).
+ * Larger target/max ⇒ fewer `cleanTexts[]` entries ⇒ fewer chunk LLM calls later.
+ * Override with env if needed (same names as below).
+ */
+const CHUNK_TARGET_DEFAULT = 4200;
+const CHUNK_MAX_DEFAULT = 6800;
+const CHUNK_OVERLAP_DEFAULT = 400;
+const CHUNK_MIN_DEFAULT = 1000;
+
+let chunkTarget = readPositiveIntEnv(
+  "AI_MATERIAL_CHUNK_TARGET_CHARS",
+  CHUNK_TARGET_DEFAULT,
+);
+let chunkMax = readPositiveIntEnv(
+  "AI_MATERIAL_CHUNK_MAX_CHARS",
+  CHUNK_MAX_DEFAULT,
+);
+if (chunkTarget > chunkMax) {
+  const swap = chunkTarget;
+  chunkTarget = chunkMax;
+  chunkMax = swap;
+}
+
+export const DEFAULT_CHUNK_TARGET_CHARS = chunkTarget;
+export const DEFAULT_CHUNK_MAX_CHARS = chunkMax;
+export const DEFAULT_CHUNK_OVERLAP_CHARS = Math.min(
+  readPositiveIntEnv(
+    "AI_MATERIAL_CHUNK_OVERLAP_CHARS",
+    CHUNK_OVERLAP_DEFAULT,
+  ),
+  Math.max(0, chunkMax - 1),
+);
+export const DEFAULT_CHUNK_MIN_CHARS = Math.min(
+  readPositiveIntEnv("AI_MATERIAL_CHUNK_MIN_CHARS", CHUNK_MIN_DEFAULT),
+  chunkTarget,
+);
+
+function splitIntoSentences(text: string): string[] {
+  const parts: string[] = [];
+  let start = 0;
+  let i = 0;
+  while (i < text.length) {
+    const c = text[i]!;
+    if (".!?。！？".includes(c)) {
+      let j = i + 1;
+      while (j < text.length && /\s/.test(text[j]!)) j++;
+      const slice = text.slice(start, j).trim();
+      if (slice) parts.push(slice);
+      start = j;
+      i = j;
+      continue;
+    }
+    i++;
+  }
+  const tail = text.slice(start).trim();
+  if (tail) parts.push(tail);
+  return parts.filter(Boolean);
+}
+
+function splitFixedWindow(
+  text: string,
+  maxChars: number,
+  overlapChars: number,
+): string[] {
+  const t = text.trim();
+  if (!t.length) return [];
+  if (t.length <= maxChars) return [t];
+
+  const out: string[] = [];
+  let start = 0;
+  const minStep = Math.max(1, maxChars - overlapChars);
+
+  while (start < t.length) {
+    let end = Math.min(start + maxChars, t.length);
+    if (end < t.length) {
+      const slice = t.slice(start, end);
+      const searchStart = Math.max(0, slice.length - 400);
+      let breakAt = -1;
+      for (let k = slice.length - 1; k >= searchStart; k--) {
+        if (/\s/.test(slice[k]!)) {
+          breakAt = start + k + 1;
+          break;
+        }
+      }
+      if (breakAt > start + Math.floor(maxChars * 0.5)) {
+        end = breakAt;
+      }
+    }
+    const piece = t.slice(start, end).trim();
+    if (piece) out.push(piece);
+    if (end >= t.length) break;
+    const nextStart = end - overlapChars;
+    start = nextStart > start ? nextStart : start + minStep;
+  }
+  return out;
+}
+
+function packUnitsToChunks(
+  units: string[],
+  joiner: string,
+  targetChars: number,
+  maxChars: number,
+  overlapChars: number,
+): string[] {
+  const out: string[] = [];
+  let current = "";
+
+  const flush = () => {
+    const trimmed = current.trim();
+    if (trimmed) out.push(trimmed);
+    current = "";
+  };
+
+  for (const uRaw of units) {
+    const u = uRaw.trim();
+    if (!u) continue;
+
+    if (u.length > maxChars) {
+      flush();
+      out.push(
+        ...splitOversizedBlock(u, targetChars, maxChars, overlapChars),
+      );
+      continue;
+    }
+
+    const candidate = current ? current + joiner + u : u;
+    if (!current) {
+      current = u;
+      continue;
+    }
+    if (candidate.length <= targetChars) {
+      current = candidate;
+    } else {
+      flush();
+      current = u;
+    }
+  }
+  flush();
+  return out;
+}
+
+function splitOversizedBlock(
+  block: string,
+  targetChars: number,
+  maxChars: number,
+  overlapChars: number,
+): string[] {
+  const b = block.trim();
+  if (!b.length) return [];
+  if (b.length <= maxChars) return [b];
+
+  const lines = b.split(/\n+/).map((l) => l.trim()).filter(Boolean);
+  if (lines.length > 1) {
+    const packed = packUnitsToChunks(
+      lines,
+      "\n",
+      targetChars,
+      maxChars,
+      overlapChars,
+    );
+    const out: string[] = [];
+    for (const piece of packed) {
+      if (piece.length > maxChars) {
+        out.push(
+          ...splitOversizedBlock(
+            piece,
+            targetChars,
+            maxChars,
+            overlapChars,
+          ),
+        );
+      } else {
+        out.push(piece);
+      }
+    }
+    return out;
+  }
+
+  const sentences = splitIntoSentences(b);
+  if (sentences.length > 1) {
+    const packed = packUnitsToChunks(
+      sentences,
+      " ",
+      targetChars,
+      maxChars,
+      overlapChars,
+    );
+    const out: string[] = [];
+    for (const piece of packed) {
+      if (piece.length > maxChars) {
+        out.push(
+          ...splitOversizedBlock(
+            piece,
+            targetChars,
+            maxChars,
+            overlapChars,
+          ),
+        );
+      } else {
+        out.push(piece);
+      }
+    }
+    return out;
+  }
+
+  return splitFixedWindow(b, maxChars, overlapChars);
+}
+
+function mergeSmallChunks(
+  chunks: string[],
+  minChars: number,
+  maxChars: number,
+): string[] {
+  const work = chunks.map((c) => c.trim()).filter((c) => c.length > 0);
+  if (work.length === 0) return [];
+
+  let i = 0;
+  while (i < work.length) {
+    const cur = work[i]!;
+    if (cur.length >= minChars || work.length === 1) {
+      i++;
+      continue;
+    }
+
+    const isLast = i === work.length - 1;
+
+    if (i > 0) {
+      const prev = work[i - 1]!;
+      const merged = `${prev}\n\n${cur}`;
+      if (merged.length <= maxChars || isLast) {
+        work[i - 1] = merged;
+        work.splice(i, 1);
+        continue;
+      }
+      if (!isLast) {
+        const next = work[i + 1]!;
+        work[i + 1] = `${cur}\n\n${next}`;
+        work.splice(i, 1);
+        continue;
+      }
+    }
+
+    if (i === 0 && work.length > 1) {
+      const next = work[1]!;
+      work[1] = `${cur}\n\n${next}`;
+      work.splice(0, 1);
+      continue;
+    }
+
+    i++;
+  }
+  return work;
+}
+
+/**
+ * Split cleaned material into paragraph-first chunks for LLM quiz generation.
+ * Overlap applies only when splitting oversized runs via fixed windows.
+ */
+export function chunkMaterialText(text: string): string[] {
+  const normalized = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
+  if (!normalized.length) {
+    throw new Error("Could not chunk material: cleaned text is empty.");
+  }
+
+  const paragraphs = normalized
+    .split(/\n{2,}/)
+    .map((p) => p.trim())
+    .filter(Boolean);
+
+  const rawChunks: string[] = [];
+  let current = "";
+
+  const flushCurrent = () => {
+    const t = current.trim();
+    if (t) rawChunks.push(t);
+    current = "";
+  };
+
+  for (const p of paragraphs) {
+    if (p.length > DEFAULT_CHUNK_MAX_CHARS) {
+      flushCurrent();
+      rawChunks.push(
+        ...splitOversizedBlock(
+          p,
+          DEFAULT_CHUNK_TARGET_CHARS,
+          DEFAULT_CHUNK_MAX_CHARS,
+          DEFAULT_CHUNK_OVERLAP_CHARS,
+        ),
+      );
+      continue;
+    }
+
+    if (!current) {
+      current = p;
+      continue;
+    }
+
+    const candidate = `${current}\n\n${p}`;
+    if (candidate.length <= DEFAULT_CHUNK_TARGET_CHARS) {
+      current = candidate;
+    } else {
+      flushCurrent();
+      current = p;
+    }
+  }
+  flushCurrent();
+
+  if (rawChunks.length === 0) {
+    throw new Error("Could not chunk material: no chunks produced.");
+  }
+
+  return mergeSmallChunks(
+    rawChunks,
+    DEFAULT_CHUNK_MIN_CHARS,
+    DEFAULT_CHUNK_MAX_CHARS,
+  );
 }
 
 export async function extractPlainTextFromUpload(options: {
