@@ -1,60 +1,20 @@
+import type {
+  AiGenerationSettings,
+  CreateGenerationInput,
+  GenerationItem,
+} from "@/api/ai-quiz-generation";
 import { normalizeQuestionCount } from "@/pages/ai-quiz-generation/constants";
 
-export type PreparedMaterialStatus = "PROCESSING" | "READY" | "FAILED";
-export type GenerationStatus = "PROCESSING" | "DONE" | "FAILED";
-
-export type AiGenerationSettings = {
-  questionCount: number;
-  difficulty: "easy" | "medium" | "hard";
-  language: "English" | "Chinese";
-};
-
-export type PreparedMaterial = {
-  preparedFileId: string;
-  fileName: string;
-  mimeType: string;
-  fileSizeBytes: number;
-  cleanCharCount: number;
-  status: PreparedMaterialStatus;
-  createdAt: string;
-  expiresAt: string;
-  errorMessage?: string;
-};
-
-export type GenerationItem = {
-  generationId: string;
-  preparedFileIds: string[];
-  status: GenerationStatus;
-  promptText: string;
-  settings: AiGenerationSettings;
-  model: string;
-  createdAt: string;
-  updatedAt: string;
-  quizId?: string;
-  quizTitle?: string;
-  quizDescription?: string;
-  errorMessage?: string;
-};
-
-export type PrepareMaterialInput = {
-  file: {
-    name: string;
-    type: string;
-    size: number;
-    textSeed?: string;
-  };
-};
-
-export type CreateGenerationInput = {
-  /** 1–3 prepared material ids (see MAX_PREPARED_MATERIALS on frontend). */
-  preparedFileIds: string[];
-  promptText: string;
-  settings: AiGenerationSettings;
-};
+export type {
+  AiGenerationSettings,
+  CreateGenerationInput,
+  GenerationItem,
+  GenerationStatus,
+  PreparedMaterial,
+  PreparedMaterialStatus,
+} from "@/api/ai-quiz-generation";
 
 const NETWORK_MS = {
-  prepare: 800,
-  deletePrepared: 400,
   createGeneration: 700,
   list: 250,
   detail: 250,
@@ -62,7 +22,6 @@ const NETWORK_MS = {
 
 const MODEL = "stepfun/step-3.5-flash:free";
 
-let preparedMaterials: PreparedMaterial[] = [];
 let generations: GenerationItem[] = [];
 
 function sleep(ms: number) {
@@ -75,10 +34,6 @@ function uid(prefix: string) {
 
 function nowIso() {
   return new Date().toISOString();
-}
-
-function plusHoursIso(hours: number) {
-  return new Date(Date.now() + hours * 60 * 60 * 1000).toISOString();
 }
 
 function buildMockQuiz(
@@ -96,45 +51,6 @@ function buildMockQuiz(
 
 function maybeFail(probability: number) {
   return Math.random() < probability;
-}
-
-export async function prepareMaterial(input: PrepareMaterialInput) {
-  await sleep(NETWORK_MS.prepare);
-  const createdAt = nowIso();
-  const base: PreparedMaterial = {
-    preparedFileId: uid("prep"),
-    fileName: input.file.name,
-    mimeType: input.file.type,
-    fileSizeBytes: input.file.size,
-    cleanCharCount: Math.max(300, Math.floor((input.file.size / 1024) * 45)),
-    status: "PROCESSING",
-    createdAt,
-    expiresAt: plusHoursIso(24),
-  };
-  preparedMaterials = [base, ...preparedMaterials];
-
-  await sleep(700);
-  preparedMaterials = preparedMaterials.map((item) => {
-    if (item.preparedFileId !== base.preparedFileId) return item;
-    if (maybeFail(0.12)) {
-      return {
-        ...item,
-        status: "FAILED",
-        errorMessage: "Could not extract readable text from this file.",
-      };
-    }
-    return { ...item, status: "READY" };
-  });
-
-  return preparedMaterials.find((i) => i.preparedFileId === base.preparedFileId)!;
-}
-
-export async function deletePreparedMaterial(preparedFileId: string) {
-  await sleep(NETWORK_MS.deletePrepared);
-  preparedMaterials = preparedMaterials.filter(
-    (item) => item.preparedFileId !== preparedFileId,
-  );
-  return { ok: true };
 }
 
 export async function createGeneration(input: CreateGenerationInput) {
@@ -210,8 +126,4 @@ export async function getGenerationDetail(generationId: string) {
   }
 
   return generations.find((g) => g.generationId === generationId) ?? null;
-}
-
-export function getPreparedMaterial(preparedFileId: string) {
-  return preparedMaterials.find((p) => p.preparedFileId === preparedFileId) ?? null;
 }

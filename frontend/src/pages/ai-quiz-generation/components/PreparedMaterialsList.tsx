@@ -1,7 +1,7 @@
-import type { PreparedMaterial } from "@/api/ai-quiz-generation.mock";
+import type { PreparedMaterial } from "@/api/ai-quiz-generation";
 import { Button } from "@/components/ui/button";
 import { MAX_PREPARED_MATERIALS } from "@/pages/ai-quiz-generation/constants";
-import { CheckCircle2, Loader2, Trash2 } from "lucide-react";
+import { CheckCircle2, Trash2 } from "lucide-react";
 
 function formatBytes(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
@@ -13,12 +13,10 @@ function formatBytes(bytes: number) {
 function PreparedMaterialRow({
   material,
   index,
-  deleting,
   onDelete,
 }: {
   material: PreparedMaterial;
   index: number;
-  deleting: boolean;
   onDelete: () => void;
 }) {
   return (
@@ -37,16 +35,11 @@ function PreparedMaterialRow({
           type="button"
           size="icon-sm"
           variant="ghost"
-          disabled={deleting}
           onClick={onDelete}
           className="shrink-0"
           aria-label="Remove file"
         >
-          {deleting ? (
-            <Loader2 className="size-4 animate-spin text-white/80" />
-          ) : (
-            <Trash2 className="size-4 text-white/70" />
-          )}
+          <Trash2 className="size-4 text-white/70" />
         </Button>
       </div>
 
@@ -65,15 +58,10 @@ function PreparedMaterialRow({
 
 type Props = {
   materials: PreparedMaterial[];
-  deletingId: string | null;
   onDelete: (preparedFileId: string) => void;
 };
 
-export default function PreparedMaterialsList({
-  materials,
-  deletingId,
-  onDelete,
-}: Props) {
+export default function PreparedMaterialsList({ materials, onDelete }: Props) {
   if (materials.length === 0) {
     return (
       <div className="bg-card border-border rounded-xl border p-4 text-sm text-white/50">
@@ -90,7 +78,6 @@ export default function PreparedMaterialsList({
           key={m.preparedFileId}
           material={m}
           index={i}
-          deleting={deletingId === m.preparedFileId}
           onDelete={() => onDelete(m.preparedFileId)}
         />
       ))}

@@ -1,12 +1,14 @@
 import {
   createGeneration,
-  deletePreparedMaterial,
   getGenerationDetail,
   listGenerations,
+} from "@/api/ai-quiz-generation.mock";
+import {
+  deletePreparedMaterial,
   prepareMaterial,
   type GenerationItem,
   type PreparedMaterial,
-} from "@/api/ai-quiz-generation.mock";
+} from "@/api/ai-quiz-generation";
 import { Button } from "@/components/ui/button";
 import {
   DEFAULT_AI_SETTINGS,
@@ -24,16 +26,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
 
-const MAX_FILE_BYTES = 20 * 1024 * 1024;
+const MAX_FILE_BYTES = 10 * 1024 * 1024;
 const ALLOWED_TYPES = new Set(["application/pdf", "text/plain"]);
-
-function toUiFile(file: File) {
-  return {
-    name: file.name,
-    type: file.type || "text/plain",
-    size: file.size,
-  };
-}
 
 function initialMaterials(
   saved: ReturnType<typeof loadAiGenerationDraft>,
@@ -57,7 +51,6 @@ export default function AiQuizGenerationPage() {
   const [preparedMaterials, setPreparedMaterials] = useState<PreparedMaterial[]>(() =>
     initialMaterials(initialDraft),
   );
-  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const generationsQuery = useQuery({
     queryKey: ["ai-quiz-generations"],
@@ -105,13 +98,12 @@ export default function AiQuizGenerationPage() {
   }, [promptText, settings, preparedMaterials]);
 
   const prepareMutation = useMutation({
-    mutationFn: (file: File) => prepareMaterial({ file: toUiFile(file) }),
+    mutationFn: (file: File) => prepareMaterial(file),
     onSuccess: (material) => {
       if (material.status === "FAILED") {
         toast.error(
           material.errorMessage ?? "Could not read this file. Try another PDF or TXT.",
         );
-        void deletePreparedMaterial(material.preparedFileId);
         return;
       }
       setPreparedMaterials((prev) => {
@@ -127,21 +119,12 @@ export default function AiQuizGenerationPage() {
     },
   });
 
-  const deletePreparedMutation = useMutation({
-    mutationFn: (preparedFileId: string) => deletePreparedMaterial(preparedFileId),
-    onMutate: (preparedFileId) => {
-      setDeletingId(preparedFileId);
-    },
-    onSuccess: (_data, preparedFileId) => {
-      setPreparedMaterials((prev) => prev.filter((p) => p.preparedFileId !== preparedFileId));
-    },
-    onError: () => {
-      toast.error("Could not remove file.");
-    },
-    onSettled: () => {
-      setDeletingId(null);
-    },
-  });
+  const removePreparedMaterial = (preparedFileId: string) => {
+    setPreparedMaterials((prev) => prev.filter((p) => p.preparedFileId !== preparedFileId));
+    void deletePreparedMaterial(preparedFileId).catch(() => {
+      /* UX: optimistic remove; TTL cleans up server-side */
+    });
+  };
 
   const createGenerationMutation = useMutation({
     mutationFn: createGeneration,
@@ -150,7 +133,9 @@ export default function AiQuizGenerationPage() {
         return [created, ...(old ?? [])];
       });
       for (const id of variables.preparedFileIds) {
-        void deletePreparedMaterial(id);
+        void deletePreparedMaterial(id).catch(() => {
+          /* Best-effort cleanup */
+        });
       }
       setPromptText("");
       setSettings({ ...DEFAULT_AI_SETTINGS });
@@ -192,7 +177,7 @@ export default function AiQuizGenerationPage() {
       return;
     }
     if (file.size > MAX_FILE_BYTES) {
-      toast.error("File too large. Maximum is 20MB per file.");
+      toast.error("File too large. Maximum is 10MB per file.");
       return;
     }
     prepareMutation.mutate(file);
@@ -216,15 +201,15 @@ export default function AiQuizGenerationPage() {
     <div className="scroll-primary flex h-full w-full flex-col gap-5 overflow-y-auto px-4 py-4">
       <div className="bg-card border-border rounded-xl border px-4 py-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-start gap-3">
-            <div className="bg-primary/15 text-primary rounded-md p-2">
-              <Bot className="size-4" />
+          <div className="flex items-center gap-3">
+            <div className="bg-primary/15 text-primary rounded-lg p-1.5">
+              <Bot className="size-5" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold">AI Quiz Generation</h1>
+              <h1 className="text-xl font-bold">AI Quiz Generation</h1>
               <p className="text-sm text-white/55">
-                Upload up to 3 materials, set rules, then generate quiz drafts
-                (mocked flow).
+                Upload up to 3 materials, set rules, then generate quiz drafts. Material
+                upload uses the server; generation is still mocked.
               </p>
             </div>
           </div>
@@ -257,8 +242,7 @@ export default function AiQuizGenerationPage() {
           />
           <PreparedMaterialsList
             materials={preparedMaterials}
-            deletingId={deletingId}
-            onDelete={(id) => deletePreparedMutation.mutate(id)}
+            onDelete={removePreparedMaterial}
           />
         </div>
 
@@ -277,9 +261,9 @@ export default function AiQuizGenerationPage() {
       </div>
 
       {/* Generation history: full width under the two steps */}
-      <section className="border-border space-y-4 border-t pt-4 mt-3">
+      <section className="border-border space-y-2 border-t pt-4 mt-3">
         <div className="flex flex-wrap items-end justify-between gap-2">
-          <h2 className="text-lg font-bold tracking-tight">Generation history</h2>
+          <h2 className="text-lg pl-1 font-bold tracking-tight">Generation history</h2>
           {isAnyPending && (
             <span className="text-xs text-white/45">Refreshing…</span>
           )}

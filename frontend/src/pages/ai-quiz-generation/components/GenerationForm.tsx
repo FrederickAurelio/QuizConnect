@@ -1,4 +1,4 @@
-import type { AiGenerationSettings } from "@/api/ai-quiz-generation.mock";
+import type { AiGenerationSettings } from "@/api/ai-quiz-generation";
 import {
   MAX_QUESTION_COUNT,
   QUESTION_COUNT_CHOICES,

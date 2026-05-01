@@ -1,7 +1,7 @@
 import type {
   AiGenerationSettings,
   PreparedMaterial,
-} from "@/api/ai-quiz-generation.mock";
+} from "@/api/ai-quiz-generation";
 import {
   MAX_PREPARED_MATERIALS,
   normalizeQuestionCount,

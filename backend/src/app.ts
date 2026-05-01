@@ -13,6 +13,7 @@ import http from "http";
 import sessionRouter from "./api/sessions/router.js";
 import { setupSocket } from "./sockets/index.js";
 import historyRouter from "./api/history/router.js";
+import aiQuizMaterialsRouter from "./api/ai-quiz-materials/router.js";
 
 // Local dev: load from .env.local. In Docker, env vars come from docker-compose (no file).
 dotenv.config({ path: ".env.local" });
@@ -125,6 +126,7 @@ apiRouter.use("/auth", authRoute);
 apiRouter.use("/quiz", quizRouter);
 apiRouter.use("/sessions", sessionRouter);
 apiRouter.use("/history", historyRouter);
+apiRouter.use("/ai-quiz-materials", aiQuizMaterialsRouter);
 app.use("/api", apiRouter);
 
 // Centralized error handling middleware

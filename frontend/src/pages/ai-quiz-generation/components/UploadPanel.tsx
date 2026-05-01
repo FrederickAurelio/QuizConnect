@@ -29,7 +29,7 @@ export default function UploadPanel({
       <div className="mb-3">
         <h2 className="text-lg font-bold">1. Upload material</h2>
         <p className="text-xs text-white/50">
-          PDF/TXT, max 20MB each. Up to {MAX_PREPARED_MATERIALS} files per
+          PDF/TXT, max 10MB each. Up to {MAX_PREPARED_MATERIALS} files per
           session.
         </p>
       </div>

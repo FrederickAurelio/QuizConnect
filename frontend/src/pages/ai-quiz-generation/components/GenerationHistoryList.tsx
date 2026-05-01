@@ -1,4 +1,4 @@
-import type { GenerationItem } from "@/api/ai-quiz-generation.mock";
+import type { GenerationItem } from "@/api/ai-quiz-generation";
 import GenerationHistoryItem from "./GenerationHistoryItem";
 
 type Props = {

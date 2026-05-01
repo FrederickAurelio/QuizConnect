@@ -1,4 +1,4 @@
-import type { GenerationItem } from "@/api/ai-quiz-generation.mock";
+import type { GenerationItem } from "@/api/ai-quiz-generation";
 import { Button } from "@/components/ui/button";
 import { CircleAlert, CircleCheck, Loader2 } from "lucide-react";
 import dayjs from "dayjs";
