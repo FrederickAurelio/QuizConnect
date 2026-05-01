@@ -22,6 +22,7 @@ import {
   completeChatJson,
   OPENROUTER_MODEL,
 } from "../../utils/openrouter.js";
+import { logAiQuizGeneration } from "../../utils/ai-quiz-generation-log.js";
 
 function quizGenModel(): string {
   return process.env.OPENROUTER_QUIZ_GEN_MODEL?.trim() || OPENROUTER_MODEL;
@@ -140,11 +141,7 @@ async function runFinalizeQuestionBatchLlm(params: {
 
   const target = Math.min(params.targetCount, params.candidates.length);
   const schema = buildFinalizeQuestionsOutputSchema(target);
-  const candidateJson = JSON.stringify(
-    { questions: params.candidates },
-    null,
-    2,
-  );
+  const candidateJson = JSON.stringify({ questions: params.candidates });
   const userContent = buildFinalizeQuestionsUserPrompt({
     batchTargetCount: target,
     language: params.language,
@@ -309,6 +306,11 @@ async function resolveMetadata(params: {
       : {}),
   });
 
+  logAiQuizGeneration("finalize: metadata OpenRouter starting", {
+    model: params.preferredModel,
+    stemsInSummary: Math.min(params.questions.length, METADATA_SUMMARY_QUESTIONS),
+  });
+
   try {
     const parsed = await runFinalizeMetadataLlmOnce({
       language: params.language,
@@ -318,15 +320,22 @@ async function resolveMetadata(params: {
       model: params.preferredModel,
     });
     if (parsed?.output.title?.trim()) {
+      logAiQuizGeneration("finalize: metadata llm ok", {
+        titleLength: parsed.output.title.length,
+      });
       return {
         title: parsed.output.title.trim(),
         description: (parsed.output.description ?? "").trim(),
       };
     }
-  } catch {
-    /* use fallback */
+    logAiQuizGeneration("finalize: metadata parse failed or empty title, fallback", {});
+  } catch (e) {
+    logAiQuizGeneration("finalize: metadata llm threw", {
+      message: e instanceof Error ? e.message : String(e),
+    });
   }
 
+  logAiQuizGeneration("finalize: metadata using deterministic fallback", {});
   return fb;
 }
 
@@ -335,6 +344,25 @@ async function resolveMetadata(params: {
  * Public contract unchanged for the orchestrator.
  */
 export async function runFinalizeLlm(params: {
+  questionCount: number;
+  language: string;
+  difficulty: string;
+  extraRules: string;
+  candidates: ChunkLlmOutput["questions"];
+}): Promise<{ output: FinalizeLlmOutput; model: string }> {
+  try {
+    return await runFinalizeLlmInner(params);
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    logAiQuizGeneration("finalize: thrown before completion", {
+      message,
+      name: e instanceof Error ? e.name : "unknown",
+    });
+    throw e;
+  }
+}
+
+async function runFinalizeLlmInner(params: {
   questionCount: number;
   language: string;
   difficulty: string;
@@ -357,6 +385,15 @@ export async function runFinalizeLlm(params: {
     maxCandidatesPerBatch: MAX_FINALIZE_CANDIDATES_PER_CALL,
   });
 
+  logAiQuizGeneration("finalize: batch plan", {
+    candidates: N,
+    target: T,
+    batchCount: plan.groupSizes.length,
+    groupSizes: plan.groupSizes,
+    targets: plan.targets,
+    concurrency: FINALIZE_CONCURRENCY,
+  });
+
   const batches = splitIntoConsecutiveBatches(
     params.candidates,
     plan.groupSizes,
@@ -374,10 +411,21 @@ export async function runFinalizeLlm(params: {
     index: i,
   }));
 
+  logAiQuizGeneration("finalize: question batches calling OpenRouter", {
+    model,
+    parallelBatchCount: tasks.length,
+  });
+
   const parallelResults = await runWithConcurrency(
     tasks,
     FINALIZE_CONCURRENCY,
     async (task) => {
+      logAiQuizGeneration("finalize: OpenRouter question batch START", {
+        taskIndex: task.index,
+        targetCount: task.targetCount,
+        candidateCount: task.candidates.length,
+        model,
+      });
       const res = await runFinalizeQuestionBatchLlm({
         candidates: task.candidates,
         targetCount: task.targetCount,
@@ -385,11 +433,31 @@ export async function runFinalizeLlm(params: {
         difficulty: params.difficulty,
         extraRules: params.extraRules,
       });
+      logAiQuizGeneration("finalize: OpenRouter question batch END", {
+        taskIndex: task.index,
+        status: res.status,
+        returnedQuestionCount: res.questions.length,
+        chatAttempts: res.attemptCount,
+        ...(res.skipOrFailReason
+          ? { skipOrFailReason: res.skipOrFailReason }
+          : {}),
+      });
       return { taskIndex: task.index, res };
     },
   );
 
   parallelResults.sort((a, b) => a.taskIndex - b.taskIndex);
+
+  let mergedForLog = 0;
+  for (const { res } of parallelResults) {
+    if (res.status === "DONE") mergedForLog += res.questions.length;
+  }
+  const failedBatches = parallelResults.filter((r) => r.res.status !== "DONE").length;
+  logAiQuizGeneration("finalize: parallel batches done", {
+    batchCount: parallelResults.length,
+    failedOrEmptyBatches: failedBatches,
+    mergedRawQuestionCount: mergedForLog,
+  });
 
   let merged: ChunkLlmOutput["questions"] = [];
   for (const { res } of parallelResults) {
@@ -401,16 +469,35 @@ export async function runFinalizeLlm(params: {
   merged = dedupeQuestionsByStem(merged);
   merged = trimToCount(merged, T);
 
+  logAiQuizGeneration("finalize: after dedupe trim", {
+    target: T,
+    mergedCount: merged.length,
+    deficit: T - merged.length,
+  });
+
   let deficit = T - merged.length;
   let fillRound = 0;
   while (deficit > 0 && fillRound < MAX_FILL_ROUNDS) {
     fillRound++;
     const taken = stemsOf(merged);
     const pool = filterCandidatesNotInStems(params.candidates, taken);
-    if (pool.length === 0) break;
+    if (pool.length === 0) {
+      logAiQuizGeneration("finalize: fill stopped, no pool left", {
+        round: fillRound,
+        deficit,
+      });
+      break;
+    }
 
     const batch = pool.slice(0, MAX_FINALIZE_CANDIDATES_PER_CALL);
     const want = Math.min(deficit, batch.length);
+
+    logAiQuizGeneration("finalize: fill round OpenRouter START", {
+      round: fillRound,
+      want,
+      poolHeadCount: batch.length,
+      model,
+    });
 
     const fillRes = await runFinalizeQuestionBatchLlm({
       candidates: batch,
@@ -421,6 +508,11 @@ export async function runFinalizeLlm(params: {
     });
 
     if (fillRes.status !== "DONE" || fillRes.questions.length === 0) {
+      logAiQuizGeneration("finalize: fill round no usable output", {
+        round: fillRound,
+        status: fillRes.status,
+        skipOrFailReason: fillRes.skipOrFailReason,
+      });
       continue;
     }
 
@@ -428,6 +520,12 @@ export async function runFinalizeLlm(params: {
     merged = dedupeQuestionsByStem(merged);
     merged = trimToCount(merged, T);
     deficit = T - merged.length;
+
+    logAiQuizGeneration("finalize: fill round applied", {
+      round: fillRound,
+      mergedCount: merged.length,
+      deficitRemaining: deficit,
+    });
   }
 
   if (merged.length < T) {
@@ -437,6 +535,11 @@ export async function runFinalizeLlm(params: {
     (err as { statusCode?: number }).statusCode = 502;
     throw err;
   }
+
+  logAiQuizGeneration("finalize: merged questions, metadata next", {
+    mergedCount: merged.length,
+    target: T,
+  });
 
   const meta = await resolveMetadata({
     language: params.language,
@@ -451,6 +554,11 @@ export async function runFinalizeLlm(params: {
     description: meta.description,
     questions: merged,
   };
+
+  logAiQuizGeneration("finalize: complete", {
+    questionCount: merged.length,
+    titleLength: meta.title.length,
+  });
 
   return { output, model };
 }

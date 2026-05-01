@@ -8,6 +8,7 @@ import { runFinalizeLlm } from "./finalizer.js";
 import { runWithConcurrency } from "./concurrency.js";
 import { releaseGenerationLock } from "./lock.js";
 import type { ChunkLlmOutput, CreateGenerationBody } from "./schemas.js";
+import { logAiQuizGeneration } from "../../utils/ai-quiz-generation-log.js";
 
 const CHUNK_CONCURRENCY = Math.min(
   10,
@@ -201,6 +202,12 @@ export async function runAiQuizGenerationJob(
     record.progress.stage = "finalize";
     await record.save();
 
+    logAiQuizGeneration("orchestrator: calling runFinalizeLlm (OpenRouter)", {
+      generationId: generationIdStr,
+      finalQuestionCount,
+      candidateCount: candidates.length,
+    });
+
     const { output: finalized, model: finalModel } = await runFinalizeLlm({
       questionCount: finalQuestionCount,
       language,
@@ -247,9 +254,19 @@ export async function runAiQuizGenerationJob(
     };
     record.set("error", null);
     await record.save();
+
+    logAiQuizGeneration("orchestrator: generation DONE, quiz persisted", {
+      generationId: generationIdStr,
+      quizQuestionCount: quizQuestions.length,
+    });
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     const stage = record.progress?.stage ?? "unknown";
+    logAiQuizGeneration("orchestrator: generation FAILED", {
+      generationId: generationIdStr,
+      stage,
+      message,
+    });
     await markFailed(
       stage === "done" || stage === "failed" ? "unknown" : stage,
       message,

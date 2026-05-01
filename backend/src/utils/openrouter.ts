@@ -5,6 +5,10 @@ dotenv.config({ path: ".env.local" });
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 
+/** Per-request cap; finalize can send large JSON so default is generous. Set to 0 to disable timeout. */
+const OPENROUTER_REQUEST_TIMEOUT_MS =
+  Number(process.env.OPENROUTER_REQUEST_TIMEOUT_MS ?? 300_000) || 0;
+
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 export const OPENROUTER_MODEL =
   process.env.OPENROUTER_MODEL || "stepfun/step-3.5-flash:free";
@@ -53,15 +57,33 @@ export async function completeChatJson(params: {
     headers["X-OpenRouter-Title"] = OPENROUTER_APP_TITLE;
   }
 
-  const res = await fetch(OPENROUTER_URL, {
+  const payload = JSON.stringify({
+    model,
+    messages: params.messages,
+    // response_format: "json_object",
+  });
+
+  const init: RequestInit = {
     method: "POST",
     headers,
-    body: JSON.stringify({
-      model,
-      messages: params.messages,
-      // response_format: "json_object",
-    }),
-  });
+    body: payload,
+  };
+  if (OPENROUTER_REQUEST_TIMEOUT_MS > 0) {
+    init.signal = AbortSignal.timeout(OPENROUTER_REQUEST_TIMEOUT_MS);
+  }
+
+  let res: Response;
+  try {
+    res = await fetch(OPENROUTER_URL, init);
+  } catch (e) {
+    const name = e instanceof Error ? e.name : "";
+    if (name === "TimeoutError" || name === "AbortError") {
+      throw new Error(
+        `OpenRouter request timed out after ${OPENROUTER_REQUEST_TIMEOUT_MS}ms (see OPENROUTER_REQUEST_TIMEOUT_MS).`,
+      );
+    }
+    throw e;
+  }
 
   if (!res.ok) {
     const text = await res.text();
