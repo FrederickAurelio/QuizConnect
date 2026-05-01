@@ -5,6 +5,7 @@ import AiPreparedMaterial from "../../models/AiPreparedMaterial.js";
 import Quiz from "../../models/Quiz.js";
 import { runChunkLlm } from "./chunk-runner.js";
 import { runFinalizeLlm } from "./finalizer.js";
+import { runWithConcurrency } from "./concurrency.js";
 import { releaseGenerationLock } from "./lock.js";
 import type { ChunkLlmOutput, CreateGenerationBody } from "./schemas.js";
 
@@ -25,28 +26,6 @@ type FlatChunk = {
   materialChunkIndex: number;
   text: string;
 };
-
-async function runWithConcurrency<T, R>(
-  items: T[],
-  limit: number,
-  fn: (item: T, index: number) => Promise<R>,
-): Promise<R[]> {
-  if (items.length === 0) return [];
-  const results: R[] = new Array(items.length);
-  let nextIndex = 0;
-  const workerCount = Math.max(1, Math.min(limit, items.length));
-
-  async function worker() {
-    while (true) {
-      const i = nextIndex++;
-      if (i >= items.length) break;
-      results[i] = await fn(items[i]!, i);
-    }
-  }
-
-  await Promise.all(Array.from({ length: workerCount }, () => worker()));
-  return results;
-}
 
 async function deletePreparedMaterialsForJob(params: {
   userId: Types.ObjectId;

@@ -96,6 +96,24 @@ export function buildFinalizeOutputSchema(questionCount: number) {
   });
 }
 
+/** Batch finalize: questions only (used for split finalize per LLM call). */
+export function buildFinalizeQuestionsOutputSchema(questionCount: number) {
+  return z.object({
+    questions: z.array(finalizeQuestionSchema).length(questionCount),
+  });
+}
+
+export type FinalizeQuestionsBatchOutput = z.infer<
+  ReturnType<typeof buildFinalizeQuestionsOutputSchema>
+>;
+
+export const finalizeMetadataOutputSchema = z.object({
+  title: z.string().min(1).max(200),
+  description: z.string().max(2000),
+});
+
+export type FinalizeMetadataOutput = z.infer<typeof finalizeMetadataOutputSchema>;
+
 export type FinalizeLlmOutput = z.infer<
   ReturnType<typeof buildFinalizeOutputSchema>
 >;

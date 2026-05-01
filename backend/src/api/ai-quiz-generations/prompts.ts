@@ -36,6 +36,7 @@ Hard requirements:
     - all distractors should be plausible in-domain
     - avoid obviously wrong joke/throwaway options
     - avoid overlapping options where multiple could be correct
+19) Prefer short rationales (one sentence when enough) without dropping correctness.
 
 Style rules:
 - Keep question stem concise, clear, and specific.
@@ -109,103 +110,95 @@ Return JSON only.`;
 
 export const CHUNK_JSON_SHAPE = `{"decision":{"isUsable":boolean,"reason":string},"questions":[{"question":string,"options":[{"key":"A"|"B"|"C"|"D","text":string},...4],"correctKey":"A"|"B"|"C"|"D","rationale":string,"difficulty":"easy"|"medium"|"hard","tags":[string]}]}`;
 
-export const FINALIZE_SYSTEM_PROMPT = `You are an assessment editor. Finalize a set of candidate MCQs into one publishable quiz draft.
+/** Select and refine questions only (no title/description). Used per batch in split finalize. */
+export const FINALIZE_QUESTIONS_SYSTEM_PROMPT = `You are an assessment editor. From a batch of candidate MCQs, select and refine exactly the requested number of questions.
 
 Non-negotiable output rules:
 1) Output VALID JSON only. No markdown. No code fences. No comments.
-2) Return exactly one JSON object with only these top-level keys: "title", "description", "questions".
-3) The "questions" array length MUST equal the requested final count exactly.
-4) Each question must contain only these keys: "question", "options", "correctKey", "rationale", "difficulty", "tags".
+2) Return exactly one JSON object with only this top-level key: "questions".
+3) The "questions" array length MUST equal the requested count exactly.
+4) Each question must contain only: "question", "options", "correctKey", "rationale", "difficulty", "tags".
 5) Each options array must contain exactly 4 items with keys A, B, C, D exactly once.
 6) correctKey must be one of A, B, C, D and must point to the single correct option.
-7) Do not add extra fields.
-8) Even if the candidate input is long, never truncate mid-object, merge keys into prose, or switch to a different JSON shape; the reply must stay one complete, schema-valid object.
+7) Do not add extra top-level or per-question keys.
+8) Reply must be one complete schema-valid JSON object — never truncate mid-object.
 
 Editing rules:
 1) Use ONLY facts present in the candidate questions. Do not invent new facts, entities, numbers, dates, causal claims, or examples.
-2) Select the strongest candidates first: grounded, standalone, useful, non-trivial, clear, and not duplicated.
-3) Remove duplicates and near-duplicates, including questions testing the same fact with different wording.
-4) Rewrite awkward wording, but preserve factual meaning.
-5) Remove all meta/source phrasing:
-   - "according to the text"
-   - "in this passage"
-   - "based on the article"
-   - "as mentioned above"
-   - any similar wording that refers to source material instead of the subject.
-6) Questions must be standalone: a learner should understand the question without seeing the source text.
-7) Prefer conceptual/comprehension questions over citation trivia, page artifacts, filenames, headers, footers, or formatting details.
-8) Keep the requested target difficulty. If candidates vary in quality, prioritize correctness and clarity over matching difficulty perfectly.
-9) Keep all final question text, options, title, and description in the requested language.
+2) Select the strongest candidates: grounded, standalone, useful, clear, non-trivial, not duplicated within this batch.
+3) Rewrite awkward wording while preserving factual meaning and correct answers.
+4) Remove meta/source phrasing ("according to the text", "in this passage", "based on the article", "as mentioned above", similar).
+5) Questions must be standalone for a learner without source context.
+6) Match target difficulty where reasonable; prioritize correctness and clarity.
+7) Keep all text in the requested language.
 
 Option quality rules:
-1) Distractors must be plausible in-domain but clearly wrong.
-2) Avoid joke options, "all of the above", "none of the above", and overlapping options.
-3) Avoid options that differ only by tiny wording changes unless the distinction is truly meaningful.
-4) Ensure no option accidentally also satisfies the question.
+1) Plausible distractors, clearly incorrect.
+2) No joke-only options; no "all of the above"; avoid overlapping interpretations.
+`;
 
-Quiz metadata rules:
-1) Title must be concise, specific, and based on the candidate subject matter.
-2) Description must be one short sentence summarizing what the quiz assesses.
-3) Do not mention chunks, candidates, uploaded files, source text, AI, or generation process.`;
-
-export function buildFinalizeUserPrompt(params: {
-  finalCount: number;
+export function buildFinalizeQuestionsUserPrompt(params: {
+  batchTargetCount: number;
   language: string;
   difficulty: string;
   extraRules: string;
   candidateJson: string;
 }): string {
-  return `Finalize these candidate MCQs into a publishable quiz draft.
+  return `Select and finalize exactly ${params.batchTargetCount} multiple-choice question(s) from the candidate list below.
 
-Required final question count: ${params.finalCount}
 Required language: ${params.language}
 Target difficulty: ${params.difficulty}
 
-User style/rule request (follow only when it does not conflict with system rules):
+User style/request (follow when it does not conflict with system rules):
 ${params.extraRules}
 
-Candidate questions JSON:
+Candidates for this batch (JSON):
 ${params.candidateJson}
 
-Structural fidelity (do not drift from this shape, especially when many candidates are listed):
-- Output must stay strictly JSON: no preamble, no postamble, no partial/truncated objects.
-- Every kept question must remain an object with exactly these keys: "question", "options", "correctKey", "rationale", "difficulty", "tags".
-- "options" must stay an array of four objects, each with "key" ("A"|"B"|"C"|"D") and "text" (string)—never collapse options into one string, omit keys, or rename fields.
-- Do not merge multiple candidates into one question object or invent alternate nesting.
+Instructions:
+- You receive at most 20 candidates in this batch. Output exactly ${params.batchTargetCount} questions in field "questions".
+- Prefer conceptual understanding over citation trivia or meta wording.
+- If two candidates overlap, keep one clear version grounded in the candidates.
+- Keep rationales brief (one sentence) when possible.
 
-Selection instructions:
-- Choose exactly ${params.finalCount} final questions.
-- If more candidates are provided, discard weak, duplicated, ambiguous, too-easy, or source-meta questions.
-- If two candidates test the same idea, keep only the clearer and more educational one.
-- Normalize every final question so it is standalone and does not refer to "text", "passage", "article", "material", "chunk", "source", or "document".
-- Keep the answer key correct after rewriting options.
-- Keep each question concise, but do not remove necessary context.
-- Preserve or improve rationales when present; if rationale is missing, write a brief rationale grounded only in the candidate.
-- Use tags sparingly: 1-4 short subject tags per question.
+Return JSON object with shape:
+{"questions":[ ... exactly ${params.batchTargetCount} question objects ... ]}
 
-You MUST return exactly one JSON object: same structure as specified above (root object plus per-question shape); match this schema exactly and add no extra keys at any level:
-{
-  "title": string,
-  "description": string,
-  "questions": [
-    {
-      "question": string,
-      "options": [
-        { "key": "A", "text": string },
-        { "key": "B", "text": string },
-        { "key": "C", "text": string },
-        { "key": "D", "text": string }
-      ],
-      "correctKey": "A"|"B"|"C"|"D",
-      "rationale": string,
-      "difficulty": "easy"|"medium"|"hard",
-      "tags": [string]
-    }
-  ]
+Return JSON only.`;
 }
 
-The questions array must contain exactly ${params.finalCount} items. Return JSON only.`;
+export const FINALIZE_QUESTIONS_JSON_SHAPE =
+  '{"questions":[{"question":string,"options":[{"key":"A"|"B"|"C"|"D","text":string},...4],"correctKey":"A"|"B"|"C"|"D","rationale":string,"difficulty":"easy"|"medium"|"hard","tags":[string]}]}';
+
+/** One-shot quiz metadata from summaries of finalized questions. */
+export const FINALIZE_METADATA_SYSTEM_PROMPT = `You write concise quiz titles and descriptions for educators.
+
+Rules:
+1) Output VALID JSON only. No markdown. No code fences.
+2) Exactly one JSON object with only keys "title" and "description".
+3) Title: short, specific, reflects the topics in the summaries.
+4) Description: one short sentence stating what skills or topics are assessed.
+5) Do NOT mention AI, uploads, chunks, files, passages, extraction, prompts, candidates, generation, or source documents.`;
+
+export function buildFinalizeMetadataUserPrompt(params: {
+  language: string;
+  difficulty: string;
+  extraRules: string;
+  questionSummaryJson: string;
+}): string {
+  return `Write a quiz title and description for the following finalized questions (summaries only).
+
+Language for title and description: ${params.language}
+Difficulty context: ${params.difficulty}
+
+User preferences (respect if compatible):
+${params.extraRules}
+
+Question summaries (JSON array of stems and light metadata):
+${params.questionSummaryJson}
+
+Return JSON only:
+{"title": string, "description": string}`;
 }
 
-export const FINALIZE_JSON_SHAPE_PREFIX =
-  '{"title":string,"description":string,"questions":[...]}';
+export const FINALIZE_METADATA_JSON_SHAPE = '{"title":string,"description":string}';
