@@ -7,7 +7,10 @@ import {
 import multer from "multer";
 import { isAuthenticated } from "../auth/controller.js";
 import { deletePreparedMaterial, prepareMaterial } from "./controller.js";
-import { MAX_PREPARED_UPLOAD_BYTES } from "./upload-limits.js";
+import {
+  MAX_PREPARED_UPLOAD_BYTES,
+  MAX_PREPARED_UPLOAD_LABEL,
+} from "./upload-limits.js";
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -22,7 +25,7 @@ function handlePrepareUpload(req: Request, res: Response, next: NextFunction) {
     if (err instanceof multer.MulterError) {
       if (err.code === "LIMIT_FILE_SIZE") {
         return res.status(413).json({
-          message: "File too large. Maximum is 5MB per file.",
+          message: `File too large. Maximum is ${MAX_PREPARED_UPLOAD_LABEL} per file.`,
           data: null,
           errors: null,
         });

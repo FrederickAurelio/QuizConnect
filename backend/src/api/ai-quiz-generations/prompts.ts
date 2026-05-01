@@ -119,6 +119,7 @@ Non-negotiable output rules:
 5) Each options array must contain exactly 4 items with keys A, B, C, D exactly once.
 6) correctKey must be one of A, B, C, D and must point to the single correct option.
 7) Do not add extra fields.
+8) Even if the candidate input is long, never truncate mid-object, merge keys into prose, or switch to a different JSON shape; the reply must stay one complete, schema-valid object.
 
 Editing rules:
 1) Use ONLY facts present in the candidate questions. Do not invent new facts, entities, numbers, dates, causal claims, or examples.
@@ -166,6 +167,12 @@ ${params.extraRules}
 Candidate questions JSON:
 ${params.candidateJson}
 
+Structural fidelity (do not drift from this shape, especially when many candidates are listed):
+- Output must stay strictly JSON: no preamble, no postamble, no partial/truncated objects.
+- Every kept question must remain an object with exactly these keys: "question", "options", "correctKey", "rationale", "difficulty", "tags".
+- "options" must stay an array of four objects, each with "key" ("A"|"B"|"C"|"D") and "text" (string)—never collapse options into one string, omit keys, or rename fields.
+- Do not merge multiple candidates into one question object or invent alternate nesting.
+
 Selection instructions:
 - Choose exactly ${params.finalCount} final questions.
 - If more candidates are provided, discard weak, duplicated, ambiguous, too-easy, or source-meta questions.
@@ -176,7 +183,7 @@ Selection instructions:
 - Preserve or improve rationales when present; if rationale is missing, write a brief rationale grounded only in the candidate.
 - Use tags sparingly: 1-4 short subject tags per question.
 
-Return exactly one JSON object. It must match this shape and contain no extra keys:
+You MUST return exactly one JSON object: same structure as specified above (root object plus per-question shape); match this schema exactly and add no extra keys at any level:
 {
   "title": string,
   "description": string,
