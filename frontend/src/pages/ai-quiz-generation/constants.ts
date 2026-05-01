@@ -12,6 +12,11 @@ export const QUESTION_COUNT_CHOICES: readonly number[] = Array.from(
 /** Max prepared material files per generation session. */
 export const MAX_PREPARED_MATERIALS = 3;
 
+/** Max upload size per prepared file (must match backend multer + controller). */
+export const MAX_PREPARED_FILE_BYTES = 5 * 1024 * 1024;
+
+export const MAX_PREPARED_FILE_LABEL = "5MB";
+
 /** Snap to nearest step between 5 and 50 (for legacy or API values). */
 export function normalizeQuestionCount(value: number): number {
   const n = Math.floor(Math.abs(value));

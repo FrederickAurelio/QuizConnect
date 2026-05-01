@@ -7,12 +7,11 @@ import {
 import multer from "multer";
 import { isAuthenticated } from "../auth/controller.js";
 import { deletePreparedMaterial, prepareMaterial } from "./controller.js";
-
-const MAX_FILE_BYTES = 10 * 1024 * 1024;
+import { MAX_PREPARED_UPLOAD_BYTES } from "./upload-limits.js";
 
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: MAX_FILE_BYTES, files: 1 },
+  limits: { fileSize: MAX_PREPARED_UPLOAD_BYTES, files: 1 },
   /** Default multer uses latin1; UTF-8 filenames (e.g. Chinese) would become mojibake. */
   defParamCharset: "utf8",
 });
@@ -23,7 +22,7 @@ function handlePrepareUpload(req: Request, res: Response, next: NextFunction) {
     if (err instanceof multer.MulterError) {
       if (err.code === "LIMIT_FILE_SIZE") {
         return res.status(413).json({
-          message: "File too large. Maximum is 10MB per file.",
+          message: "File too large. Maximum is 5MB per file.",
           data: null,
           errors: null,
         });

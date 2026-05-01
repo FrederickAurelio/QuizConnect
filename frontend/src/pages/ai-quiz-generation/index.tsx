@@ -14,7 +14,11 @@ import {
   loadAiGenerationDraft,
   saveAiGenerationDraft,
 } from "@/pages/ai-quiz-generation/storage";
-import { MAX_PREPARED_MATERIALS } from "@/pages/ai-quiz-generation/constants";
+import {
+  MAX_PREPARED_FILE_BYTES,
+  MAX_PREPARED_FILE_LABEL,
+  MAX_PREPARED_MATERIALS,
+} from "@/pages/ai-quiz-generation/constants";
 import GenerationForm from "@/pages/ai-quiz-generation/components/GenerationForm";
 import GenerationHistoryList from "@/pages/ai-quiz-generation/components/GenerationHistoryList";
 import PreparedMaterialsList from "@/pages/ai-quiz-generation/components/PreparedMaterialsList";
@@ -25,7 +29,6 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
 
-const MAX_FILE_BYTES = 10 * 1024 * 1024;
 const ALLOWED_TYPES = new Set(["application/pdf", "text/plain"]);
 
 function initialMaterials(
@@ -185,8 +188,8 @@ export default function AiQuizGenerationPage() {
       toast.error("Only PDF and TXT files are allowed.");
       return;
     }
-    if (file.size > MAX_FILE_BYTES) {
-      toast.error("File too large. Maximum is 10MB per file.");
+    if (file.size > MAX_PREPARED_FILE_BYTES) {
+      toast.error(`File too large. Maximum is ${MAX_PREPARED_FILE_LABEL} per file.`);
       return;
     }
     prepareMutation.mutate(file);

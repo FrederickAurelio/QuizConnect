@@ -1,6 +1,9 @@
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { MAX_PREPARED_MATERIALS } from "@/pages/ai-quiz-generation/constants";
+import {
+  MAX_PREPARED_FILE_LABEL,
+  MAX_PREPARED_MATERIALS,
+} from "@/pages/ai-quiz-generation/constants";
 import { cn } from "@/lib/utils";
 import { FileUp, Loader2 } from "lucide-react";
 import { useId, useRef } from "react";
@@ -29,8 +32,8 @@ export default function UploadPanel({
       <div className="mb-3">
         <h2 className="text-lg font-bold">1. Upload material</h2>
         <p className="text-xs text-white/50">
-          PDF/TXT, max 10MB each. Up to {MAX_PREPARED_MATERIALS} files per
-          session.
+          PDF/TXT, max {MAX_PREPARED_FILE_LABEL} each. Up to {MAX_PREPARED_MATERIALS}{" "}
+          files per session.
         </p>
       </div>
       <Label className="mb-2 block">Material files</Label>

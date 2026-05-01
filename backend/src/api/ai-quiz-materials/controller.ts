@@ -8,6 +8,7 @@ import {
   extractPlainTextFromUpload,
   type AllowedMime,
 } from "./material-text.js";
+import { MAX_PREPARED_UPLOAD_BYTES } from "./upload-limits.js";
 
 const TTL_MS = 24 * 60 * 60 * 1000;
 
@@ -65,9 +66,9 @@ export const prepareMaterial = async (req: Request, res: Response) => {
       });
     }
 
-    if (file.size > 10 * 1024 * 1024) {
+    if (file.size > MAX_PREPARED_UPLOAD_BYTES) {
       return res.status(413).json({
-        message: "File too large. Maximum is 10MB per file.",
+        message: "File too large. Maximum is 5MB per file.",
         data: null,
         errors: null,
       });
