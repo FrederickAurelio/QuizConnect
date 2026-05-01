@@ -5,6 +5,7 @@ import {
   listGenerations,
   deletePreparedMaterial,
   prepareMaterial,
+  validatePreparedChunks,
   type GenerationItem,
   type PreparedMaterial,
 } from "@/api/ai-quiz-generation";
@@ -197,10 +198,18 @@ export default function AiQuizGenerationPage() {
     prepareMutation.mutate(file);
   };
 
-  const onGenerate = () => {
+  const onGenerate = async () => {
     if (generationDisabled || !hasPreparedFiles) return;
     const ids = preparedMaterials.map((m) => m.preparedFileId);
     const trimmedPrompt = promptText.trim();
+    try {
+      await validatePreparedChunks(ids);
+    } catch (e) {
+      toast.error(
+        e instanceof Error ? e.message : "Prepared material could not be validated.",
+      );
+      return;
+    }
     createGenerationMutation.mutate({
       preparedFileIds: ids,
       promptText: trimmedPrompt || "Generate a balanced quiz from the material.",

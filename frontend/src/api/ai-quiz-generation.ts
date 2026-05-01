@@ -45,6 +45,11 @@ export type CreateGenerationInput = {
   settings: AiGenerationSettings;
 };
 
+export type ValidatePreparedChunksResult = {
+  chunkTotal: number;
+  maxChunks: number;
+};
+
 function getErrorMessage(err: unknown): string {
   if (err instanceof Error) return err.message;
   return "Could not prepare file. Please try again.";
@@ -76,6 +81,25 @@ export async function deletePreparedMaterial(preparedFileId: string): Promise<vo
   await api.delete<ApiResponse<null>>(
     `/ai-quiz-materials/${encodeURIComponent(preparedFileId)}`,
   );
+}
+
+export async function validatePreparedChunks(
+  preparedFileIds: string[],
+): Promise<ValidatePreparedChunksResult> {
+  try {
+    const res = await api.post<ApiResponse<ValidatePreparedChunksResult>>(
+      "/ai-quiz-generations/validate-prepared",
+      { preparedFileIds },
+    );
+    if (!res.data.data) {
+      throw new Error(res.data.message ?? "Could not validate prepared files.");
+    }
+    return res.data.data;
+  } catch (e: unknown) {
+    const ax = e as AxiosError<ApiResponse<null>>;
+    const msg = ax.response?.data?.message ?? getErrorMessage(e);
+    throw new Error(msg);
+  }
 }
 
 export async function createGeneration(

@@ -24,6 +24,14 @@ export const createGenerationBodySchema = z.object({
 
 export type CreateGenerationBody = z.infer<typeof createGenerationBodySchema>;
 
+export const validatePreparedChunksBodySchema = z.object({
+  preparedFileIds: z.array(z.string().min(1)).min(1).max(3),
+});
+
+export type ValidatePreparedChunksBody = z.infer<
+  typeof validatePreparedChunksBodySchema
+>;
+
 const chunkDecisionSchema = z.object({
   isUsable: z.boolean(),
   reason: z.string(),

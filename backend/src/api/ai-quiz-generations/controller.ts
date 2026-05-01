@@ -1,8 +1,14 @@
 import type { Request, Response } from "express";
 import { Types } from "mongoose";
-import { createGenerationBodySchema } from "./schemas.js";
+import {
+  createGenerationBodySchema,
+  validatePreparedChunksBodySchema,
+} from "./schemas.js";
+import {
+  MAX_PREPARED_CHUNKS_PER_GENERATION,
+  sumPreparedChunksForGeneration,
+} from "./prepared-chunk-budget.js";
 import AiQuizGenerationRecord from "../../models/AiQuizGenerationRecord.js";
-import AiPreparedMaterial from "../../models/AiPreparedMaterial.js";
 import { handleControllerError } from "../../utils/handle-control-error.js";
 import {
   acquireGenerationLock,
@@ -72,6 +78,52 @@ export function toClientGeneration(doc: GenerationRecordLike) {
   };
 }
 
+export const validatePreparedChunksForGeneration = async (
+  req: Request,
+  res: Response,
+) => {
+  try {
+    const userId = req.session.userId;
+    if (!userId || req.session.type !== "auth") {
+      return res.status(401).json({
+        message: "Unauthorized!",
+        data: null,
+        errors: null,
+      });
+    }
+
+    const body = validatePreparedChunksBodySchema.parse(req.body ?? {});
+    const preparedObjectIds = body.preparedFileIds.map(
+      (id) => new Types.ObjectId(id),
+    );
+    const userObjectId = new Types.ObjectId(String(userId));
+
+    const chunkCheck = await sumPreparedChunksForGeneration({
+      userObjectId,
+      preparedObjectIds,
+    });
+
+    if (!chunkCheck.ok) {
+      return res.status(400).json({
+        message: chunkCheck.message,
+        data: null,
+        errors: null,
+      });
+    }
+
+    return res.status(200).json({
+      message: "OK",
+      data: {
+        chunkTotal: chunkCheck.chunkTotal,
+        maxChunks: MAX_PREPARED_CHUNKS_PER_GENERATION,
+      },
+      errors: null,
+    });
+  } catch (error: unknown) {
+    return handleControllerError(res, error);
+  }
+};
+
 export const createAiQuizGeneration = async (req: Request, res: Response) => {
   try {
     const userId = req.session.userId;
@@ -89,18 +141,14 @@ export const createAiQuizGeneration = async (req: Request, res: Response) => {
     );
     const userObjectId = new Types.ObjectId(String(userId));
 
-    const materials = await AiPreparedMaterial.find({
-      _id: { $in: preparedObjectIds },
-      userId: userObjectId,
-      status: "READY",
-    })
-      .select({ _id: 1 })
-      .lean();
+    const chunkCheck = await sumPreparedChunksForGeneration({
+      userObjectId,
+      preparedObjectIds,
+    });
 
-    if (materials.length !== preparedObjectIds.length) {
+    if (!chunkCheck.ok) {
       return res.status(400).json({
-        message:
-          "One or more prepared files are missing, expired, or do not belong to you.",
+        message: chunkCheck.message,
         data: null,
         errors: null,
       });
