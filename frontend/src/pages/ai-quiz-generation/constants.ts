@@ -17,6 +17,9 @@ export const MAX_PREPARED_FILE_BYTES = 5 * 1024 * 1024;
 
 export const MAX_PREPARED_FILE_LABEL = "5MB";
 
+/** Poll generation detail while status is PROCESSING (jobs often take minutes). */
+export const AI_GENERATION_DETAIL_POLL_MS = 20_000;
+
 /** Snap to nearest step between 5 and 50 (for legacy or API values). */
 export function normalizeQuestionCount(value: number): number {
   const n = Math.floor(Math.abs(value));

@@ -15,6 +15,7 @@ import {
   saveAiGenerationDraft,
 } from "@/pages/ai-quiz-generation/storage";
 import {
+  AI_GENERATION_DETAIL_POLL_MS,
   MAX_PREPARED_FILE_BYTES,
   MAX_PREPARED_FILE_LABEL,
   MAX_PREPARED_MATERIALS,
@@ -72,7 +73,8 @@ export default function AiQuizGenerationPage() {
     enabled: !!activeGeneration?.generationId,
     refetchInterval: (query) => {
       const value = query.state.data;
-      if (!value || value.status === "PROCESSING") return 5000;
+      if (!value || value.status === "PROCESSING")
+        return AI_GENERATION_DETAIL_POLL_MS;
       return false;
     },
     refetchOnWindowFocus: false,
