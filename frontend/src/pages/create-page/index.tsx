@@ -34,7 +34,7 @@ import {
 import { ArrowLeft } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useForm } from "react-hook-form";
+import { useFieldArray, useForm } from "react-hook-form";
 import { useBlocker, useNavigate } from "react-router";
 import { v4 as uuidv4 } from "uuid";
 import z from "zod";
@@ -109,6 +109,11 @@ function CreatePage({ editMode = false, editData }: Props) {
   const skipBlockerRef = useRef(false);
   const manualSaveBusyRef = useRef(false);
   const questions = form.watch("questions");
+  const { fields, append: appendQuestion, remove: removeQuestionAt, replace } =
+    useFieldArray({
+      control: form.control,
+      name: "questions",
+    });
   const currentQuizId = editData?._id;
 
   const blocker = useBlocker(
@@ -189,7 +194,7 @@ function CreatePage({ editMode = false, editData }: Props) {
   };
 
   const append = (newData: Question) => {
-    form.setValue("questions", [...questions, newData]);
+    appendQuestion(newData);
 
     requestAnimationFrame(() => {
       scrollBoxRef.current?.scrollTo({
@@ -198,12 +203,14 @@ function CreatePage({ editMode = false, editData }: Props) {
       });
     });
   };
-  const remove = (id: any) => {
-    const afterRemove = questions.filter((q) => q.id !== id);
-    if (afterRemove.length < 1) {
-      form.setValue("questions", [createNewQuestion()]);
+  const remove = (id: Question["id"]) => {
+    const list = form.getValues("questions");
+    const index = list.findIndex((q) => q.id === id);
+    if (index === -1) return;
+    if (list.length <= 1) {
+      replace([createNewQuestion()]);
     } else {
-      form.setValue("questions", afterRemove);
+      removeQuestionAt(index);
     }
   };
 
@@ -311,11 +318,13 @@ function CreatePage({ editMode = false, editData }: Props) {
           className="scroll-primary flex flex-col gap-3 overflow-y-auto"
           ref={scrollBoxRef}
         >
-          {questions.map((q, qIndex) =>
-            q.done ? (
+          {fields.map((field, qIndex) => {
+            const q = questions[qIndex];
+            if (!q) return null;
+            return q.done ? (
               <DoneQuestionCard
                 form={form}
-                key={q.id}
+                key={field.id}
                 q={q}
                 qIndex={qIndex}
                 remove={remove}
@@ -323,13 +332,13 @@ function CreatePage({ editMode = false, editData }: Props) {
             ) : (
               <QuestionForm
                 form={form}
-                key={q.id}
+                key={field.id}
                 q={q}
                 qIndex={qIndex}
                 remove={remove}
               />
-            ),
-          )}
+            );
+          })}
           {/* Add New Question */}
           <AddNewQuestionBtn onClick={() => append(createNewQuestion())} />
         </div>
