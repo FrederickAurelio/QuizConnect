@@ -5,6 +5,7 @@ import { useLogin } from "@/contexts/login-context";
 import { handleGeneralError } from "@/lib/axios";
 import type { Question } from "@/pages/create-page";
 import { Leaderboard } from "@/pages/game-page/components/Leaderboard";
+import AiAnalyticsControl from "@/pages/history/components/AiAnalyticsControl";
 import {
   QuestionContent,
   type GroupedAnswers,
@@ -12,8 +13,8 @@ import {
 import LoadingPage from "@/pages/loading-page";
 import { useQuery } from "@tanstack/react-query";
 import dayjs from "dayjs";
-import { useMemo } from "react";
-import { Navigate, useParams } from "react-router";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Navigate, useParams, useSearchParams } from "react-router";
 
 function QuestionWrapper({
   quesionIndex,
@@ -22,15 +23,23 @@ function QuestionWrapper({
   playerAnswer,
   playerMap,
   isHost,
+  gameId,
+  aiExplainEnabled,
+  aiExplainDisabledReason,
+  viewAs,
 }: {
   quesionIndex: number;
   curQuestion: Question;
-  myAnswer: AnswerLog;
-  playerAnswer: AnswerLog[];
+  myAnswer?: AnswerLog;
+  playerAnswer?: AnswerLog[];
   playerMap: {
     [k: string]: PlayerSnapshot;
   };
   isHost: boolean;
+  gameId: string;
+  aiExplainEnabled: boolean;
+  aiExplainDisabledReason?: string;
+  viewAs?: "host" | "player";
 }) {
   const isAnswered = myAnswer?.key;
 
@@ -69,6 +78,10 @@ function QuestionWrapper({
           isAnswered={isAnswered}
           isHost={isHost}
           groupedAnswers={groupedAnswers}
+          aiExplainEnabled={aiExplainEnabled}
+          aiExplainDisabledReason={aiExplainDisabledReason}
+          historyGameId={gameId}
+          viewAs={viewAs}
         />
       </div>
       <hr className="my-8 w-full border-white/10" />
@@ -77,7 +90,7 @@ function QuestionWrapper({
 }
 
 function HistoryDetail() {
-  const { user } = useLogin();
+  const { user, isAuthenticated } = useLogin();
   const { gameId } = useParams();
 
   const historyQuery = useQuery({
@@ -89,6 +102,39 @@ function HistoryDetail() {
     refetchOnMount: "always",
     refetchOnWindowFocus: false,
   });
+
+  const [searchParams] = useSearchParams();
+  const [viewMode, setViewMode] = useState<"host" | "player">(
+    (searchParams.get("viewAs") as "host" | "player" | undefined) ?? "host",
+  );
+  const [highlightedQuestionIndex, setHighlightedQuestionIndex] = useState<
+    number | null
+  >(null);
+  const evidenceHighlightTimerRef = useRef<ReturnType<
+    typeof setTimeout
+  > | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (evidenceHighlightTimerRef.current) {
+        clearTimeout(evidenceHighlightTimerRef.current);
+      }
+    };
+  }, []);
+
+  const handleEvidenceClick = useCallback((questionIndex: number) => {
+    const target = document.getElementById(`history-question-${questionIndex}`);
+    if (!target) return;
+    target.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (evidenceHighlightTimerRef.current) {
+      clearTimeout(evidenceHighlightTimerRef.current);
+    }
+    setHighlightedQuestionIndex(questionIndex);
+    evidenceHighlightTimerRef.current = setTimeout(() => {
+      setHighlightedQuestionIndex(null);
+      evidenceHighlightTimerRef.current = null;
+    }, 1500);
+  }, []);
 
   const history = historyQuery.data?.data;
 
@@ -110,6 +156,18 @@ function HistoryDetail() {
 
   const isHost = history.host._id === user?.userId;
   const playerMap = Object.fromEntries(history.players.map((p) => [p._id, p]));
+  const partOfTheGame =
+    isHost || history.players.some((p) => p.userId === user?.userId);
+
+  const aiFeaturesEnabled = isAuthenticated && partOfTheGame;
+  const aiFeatureDisabledReason =
+    isAuthenticated && !partOfTheGame
+      ? "Only the host and players can access AI features."
+      : !isAuthenticated
+        ? "Sign in to use AI explanations and analytics."
+        : undefined;
+  const showViewToggle = isHost && !!history.settings?.hostCanPlay;
+  const analyticsView = showViewToggle ? viewMode : isHost ? "host" : "player";
 
   return (
     <div className="scroll-primary flex h-full flex-col items-center gap-2 overflow-x-hidden overflow-y-auto py-10">
@@ -185,23 +243,103 @@ function HistoryDetail() {
 
       <hr className="my-8 w-full border-white/10" />
 
-      <div className="flex flex-col items-center gap-1 py-5">
-        <h1 className="text-3xl font-bold">Questions</h1>
-        <h2 className="text-sm font-semibold text-white/30">
-          Review each question and your answers
-        </h2>
+      {showViewToggle ? (
+        <div className="mx-auto mb-2 w-full max-w-[850px] px-2 py-5">
+          <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
+            <div className="flex w-full min-w-0 flex-col gap-1 text-center sm:w-auto sm:flex-1 sm:text-left">
+              <h1 className="text-3xl font-bold">Questions</h1>
+              <h2 className="text-sm font-semibold text-white/30">
+                Review each question and your answers
+              </h2>
+            </div>
+            <div className="border-border bg-card flex w-fit shrink-0 items-center justify-center rounded-lg border p-1">
+              {(
+                [
+                  { key: "host", label: "Host" },
+                  { key: "player", label: "Player" },
+                ] as const
+              ).map((tab) => (
+                <div
+                  key={tab.key}
+                  className={`w-16 cursor-default py-1 text-center text-sm font-semibold transition-colors duration-100 ${
+                    viewMode === tab.key
+                      ? "bg-border text-secondary-foreground rounded-md"
+                      : "text-white/40"
+                  }`}
+                  onClick={() => setViewMode(tab.key)}
+                >
+                  {tab.label}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="flex flex-col items-center gap-1 py-5">
+          <h1 className="text-3xl font-bold">Questions</h1>
+          <h2 className="text-sm font-semibold text-white/30">
+            Review each question and your answers
+          </h2>
+        </div>
+      )}
+
+      <div className="mx-auto w-full max-w-[850px] px-2 sm:px-3">
+        <div className="bg-card border-border mb-8 rounded-xl border p-3 sm:p-4">
+          <AiAnalyticsControl
+            key={analyticsView}
+            gameId={gameId}
+            viewAs={analyticsView}
+            analyticsAllowed={aiFeaturesEnabled}
+            analyticsDisabledReason={aiFeatureDisabledReason}
+            onEvidenceClick={handleEvidenceClick}
+          >
+            <div>
+              <h2 className="text-lg font-bold text-white/90">
+                AI session analytics
+              </h2>
+              <p className="mt-0.5 text-xs text-white/45 sm:max-w-md">
+                Role-based session summary with evidence links to questions
+                below.
+              </p>
+            </div>
+          </AiAnalyticsControl>
+        </div>
       </div>
 
-      {history.quiz.questions.map((q, idx) => (
-        <QuestionWrapper
-          quesionIndex={idx}
-          curQuestion={q}
-          myAnswer={history?.myAnswer?.[idx] as AnswerLog}
-          playerAnswer={history?.playersAnswer?.[idx] as AnswerLog[]}
-          playerMap={playerMap}
-          isHost={isHost}
-        />
-      ))}
+      {history.quiz.questions.map((q, idx) => {
+        const rowMyAnswer = history.myAnswer?.[idx];
+        const rowPlayerAnswer = history.playersAnswer?.[idx];
+
+        const useHostDashboard = showViewToggle ? viewMode === "host" : isHost;
+
+        const myAnswer = useHostDashboard ? undefined : rowMyAnswer;
+        const playerAnswer = useHostDashboard ? rowPlayerAnswer : undefined;
+
+        return (
+          <div
+            key={idx}
+            id={`history-question-${idx}`}
+            className={`w-full max-w-[850px] rounded-xl transition-shadow duration-300 ${
+              highlightedQuestionIndex === idx
+                ? "ring-primary/45 ring-2 ring-offset-2 ring-offset-transparent"
+                : ""
+            }`}
+          >
+            <QuestionWrapper
+              quesionIndex={idx}
+              curQuestion={q}
+              myAnswer={myAnswer}
+              playerAnswer={playerAnswer}
+              playerMap={playerMap}
+              isHost={useHostDashboard}
+              gameId={gameId}
+              aiExplainEnabled={aiFeaturesEnabled}
+              aiExplainDisabledReason={aiFeatureDisabledReason}
+              viewAs={showViewToggle ? viewMode : undefined}
+            />
+          </div>
+        );
+      })}
     </div>
   );
 }

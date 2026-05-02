@@ -11,7 +11,7 @@ const optionSchema = new mongoose.Schema(
       trim: true,
     },
   },
-  { _id: false }
+  { _id: false },
 );
 
 export const questionSchema = new mongoose.Schema(
@@ -25,7 +25,7 @@ export const questionSchema = new mongoose.Schema(
     },
     done: { type: Boolean, default: false },
   },
-  { _id: false }
+  { _id: false },
 );
 
 const quizSchema = new mongoose.Schema(
@@ -43,8 +43,9 @@ const quizSchema = new mongoose.Schema(
       ref: "User",
     },
     draft: { type: Boolean, default: false },
+    hasQuizDraft: { type: Boolean, default: false },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 // We validate the "Ready to Publish" rules here, once, at the top level.
@@ -71,14 +72,14 @@ quizSchema.pre("save", function (next) {
     // Check Correct Key
     if (!q.correctKey) {
       return next(
-        new Error(`Question "${q.question}" is missing a correct answer.`)
+        new Error(`Question "${q.question}" is missing a correct answer.`),
       );
     }
 
     // Check Options Count
     if (q.options.length !== 4) {
       return next(
-        new Error(`Question "${q.question}" must have exactly 4 options.`)
+        new Error(`Question "${q.question}" must have exactly 4 options.`),
       );
     }
 
@@ -86,7 +87,7 @@ quizSchema.pre("save", function (next) {
     for (const opt of q.options) {
       if (!opt.text || opt.text.trim() === "") {
         return next(
-          new Error(`An option in question "${q.question}" is empty.`)
+          new Error(`An option in question "${q.question}" is empty.`),
         );
       }
     }

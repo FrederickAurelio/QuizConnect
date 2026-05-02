@@ -3,6 +3,58 @@ import type { UserInfo } from "@/api/sessions";
 import { api } from "@/lib/axios";
 import type { Question } from "@/pages/create-page";
 
+export type AiExplanationPayload = {
+  verifiedCorrectKey: "A" | "B" | "C" | "D" | "NONE";
+  agreesWithQuizKey: boolean;
+  rationale: string;
+  feedback: string;
+  sources: { title: string; urlOrNote: string }[];
+};
+
+export type AiExplanationEnvelope = {
+  payload: AiExplanationPayload;
+  model: string;
+  createdAt: string;
+  schemaVersion: number;
+};
+
+export type AiAnalyticsInsight = {
+  title: string;
+  detail: string;
+  evidence?: { questionIndices: number[] };
+  relatedQuestionIndices?: number[];
+};
+
+export type AiAnalyticsPayload = {
+  summary: string;
+  strengths: AiAnalyticsInsight[];
+  weaknesses: AiAnalyticsInsight[];
+  recommendations: AiAnalyticsInsight[];
+};
+
+export type AiAnalyticsEnvelope = {
+  payload: AiAnalyticsPayload;
+  model: string;
+  createdAt: string;
+  schemaVersion: number;
+};
+
+export type PostHistoryExplainResponseData = {
+  explanation?: AiExplanationEnvelope;
+  cached?: boolean;
+  coalesced?: boolean;
+  status?: "processing";
+  retryAfterMs?: number;
+};
+
+export type PostHistoryAnalyticsResponseData = {
+  analytics?: AiAnalyticsEnvelope;
+  cached?: boolean;
+  coalesced?: boolean;
+  status?: "processing";
+  retryAfterMs?: number;
+};
+
 type GetHistoriesRequest = ApiRequestQuery & {
   type: "play" | "host";
 };
@@ -61,6 +113,7 @@ export interface HistoryDetailBase {
     shuffleAnswers: boolean;
     timePerQuestion: string;
     cooldown: string;
+    hostCanPlay?: boolean;
   };
   sessionCreatedAt: string;
   createdAt: string;
@@ -77,7 +130,15 @@ export interface HistoryDetailPlayerView extends HistoryDetailBase {
   myAnswer: AnswerLog[];
 }
 
-export type HistoryDetail = HistoryDetailHostView | HistoryDetailPlayerView;
+export interface HistoryDetailHostPlayerView extends HistoryDetailBase {
+  playersAnswer: AnswerLog[][];
+  myAnswer: AnswerLog[];
+}
+
+export type HistoryDetail =
+  | HistoryDetailHostView
+  | HistoryDetailPlayerView
+  | HistoryDetailHostPlayerView;
 
 export const getHistories = async ({
   page = 1,
@@ -102,4 +163,34 @@ export const getHistoryDetail = async (gameId: string) => {
   };
   const resData = { ...res.data, data: data };
   return resData as ApiResponse<HistoryDetail>;
+};
+
+export const postHistoryQuestionExplain = async (
+  gameId: string,
+  body: { questionIndex: number; viewAs?: "host" | "player" },
+) => {
+  const res = await api.post<ApiResponse<PostHistoryExplainResponseData>>(
+    `/history/${gameId}/explain`,
+    body,
+    {
+      timeout: 120_000,
+      validateStatus: (status) => status === 200 || status === 202,
+    },
+  );
+  return res.data;
+};
+
+export const postHistorySessionAnalytics = async (
+  gameId: string,
+  body: { viewAs?: "host" | "player" },
+) => {
+  const res = await api.post<ApiResponse<PostHistoryAnalyticsResponseData>>(
+    `/history/${gameId}/analytics`,
+    body,
+    {
+      timeout: 120_000,
+      validateStatus: (status) => status === 200 || status === 202,
+    },
+  );
+  return res.data;
 };

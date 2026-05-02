@@ -17,6 +17,7 @@ import LobbyPageRoute from "@/pages/lobby-page-route";
 import EditProfileProvider from "@/contexts/edit-profile-context";
 import HistoryList from "@/pages/history/HistoryList";
 import HistoryDetail from "@/pages/history/HistoryDetail";
+import AiQuizGenerationPage from "@/pages/ai-quiz-generation";
 
 // -------------------- Private Route --------------------
 function PrivateRoute({ children }: { children: React.ReactNode }) {
@@ -64,6 +65,14 @@ function AppRouter() {
           element: (
             <PrivateRoute>
               <CreatePage />
+            </PrivateRoute>
+          ),
+        },
+        {
+          path: "/ai-generate",
+          element: (
+            <PrivateRoute>
+              <AiQuizGenerationPage />
             </PrivateRoute>
           ),
         },

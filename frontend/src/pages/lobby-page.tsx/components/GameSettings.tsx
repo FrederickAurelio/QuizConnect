@@ -33,6 +33,7 @@ type GameSettingsProps = {
     shuffleAnswers: boolean;
     timePerQuestion: string;
     cooldown: string;
+    hostCanPlay: boolean;
   };
   updateSetting: (
     key:
@@ -41,7 +42,8 @@ type GameSettingsProps = {
       | "shuffleQuestions"
       | "shuffleAnswers"
       | "timePerQuestion"
-      | "cooldown",
+      | "cooldown"
+      | "hostCanPlay",
     value: any,
   ) => void;
 };
@@ -116,6 +118,24 @@ function GameSettings({
       </Dialog>
 
       <div className="scroll-primary flex flex-col gap-6 overflow-y-auto px-2">
+        {/* GROUP 0: Host Participation */}
+        <section className="flex flex-col gap-4">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex flex-col leading-tight">
+              <p className="text-white/60">Host Can Play</p>
+              <p className="text-xs text-white/30">Join the game as a player</p>
+            </div>
+            <Switch
+              disabled={!isHost}
+              size="xl"
+              checked={settings.hostCanPlay}
+              onCheckedChange={(val) => updateSetting("hostCanPlay", val)}
+            />
+          </div>
+        </section>
+
+        <hr className="border-white/10" />
+
         {/* GROUP 1: Capacity & Content */}
         <section className="flex flex-col gap-4">
           <div className="flex items-center justify-between gap-3">

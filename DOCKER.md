@@ -185,14 +185,31 @@ You don’t need MongoDB or Redis installed on your machine. Run only the databa
 
 ### Step 1: Start only MongoDB and Redis (Docker)
 
-From the project root:
+From the project root, use **both** compose files. The base `docker-compose.yml` does **not** publish database ports to your machine; `docker-compose.dev-db.yml` adds `27017` and `6379` so Express and Vite on the host can reach MongoDB and Redis.
 
 ```bash
-docker compose up -d mongodb redis
 docker compose -f docker-compose.yml -f docker-compose.dev-db.yml up -d mongodb redis
 ```
 
+If you run only `docker compose up -d mongodb redis` (without `docker-compose.dev-db.yml`), the containers may start but **nothing listens on localhost:27017 / 6379**, and `npm run dev` for the backend will fail to connect.
+
 MongoDB is on **localhost:27017**, Redis on **localhost:6379**. Data is stored in the same Docker volumes (`mongo_data`, `redis_data`) as when you run the full stack, so you can switch between “full Docker” and “local dev” without losing data.
+
+**If Docker itself errors:**
+
+- **`failed to connect to the docker API at unix:///var/run/docker.sock`** (or **`no such file or directory`** for that socket): the **Docker daemon is not running** or your CLI is pointed at the wrong socket. On most Linux installs (including Arch/CachyOS), start and enable the service:
+
+  ```bash
+  sudo systemctl start docker
+  sudo systemctl enable docker   # optional: start on boot
+  docker info                     # should print server info, not an error
+  ```
+
+  If you use **Docker Desktop**, open the app and wait until it says Docker is running; Desktop may use a different context (`docker context ls`).
+
+  Your user may need to be in the **`docker`** group to run without `sudo`: `sudo usermod -aG docker $USER` then log out and back in.
+
+- **`port is already allocated`:** another process or container is using 27017 or 6379 — stop it or change the host-side ports in `docker-compose.dev-db.yml`.
 
 ### Step 2: Backend env (no need to switch for dev vs prod)
 
@@ -249,33 +266,26 @@ We’ll cover:
 
 This is what you already do: Express + Vite on your PC, MongoDB + Redis in Docker.
 
-1. From project root, start only MongoDB + Redis in Docker.
-   - **Normal dev (backend only talks to DBs):**
+1. From project root, start only MongoDB + Redis in Docker **with published ports** (required when the backend runs on the host via `npm run dev`):
 
-     ```bash
-     docker compose up -d mongodb redis
-     ```
+   ```bash
+   docker compose -f docker-compose.yml -f docker-compose.dev-db.yml up -d mongodb redis
+   ```
 
-   - **If you also want to reach Mongo/Redis from host tools (e.g. `mongosh`, GUI client):**
+   The `docker-compose.dev-db.yml` file only adds:
 
-     ```bash
-     docker compose -f docker-compose.yml -f docker-compose.dev-db.yml up -d mongodb redis
-     ```
+   ```yaml
+   services:
+     mongodb:
+       ports:
+         - "27017:27017"
 
-     The `docker-compose.dev-db.yml` file only adds:
+     redis:
+       ports:
+         - "6379:6379"
+   ```
 
-     ```yaml
-     services:
-       mongodb:
-         ports:
-           - "27017:27017"
-
-       redis:
-         ports:
-           - "6379:6379"
-     ```
-
-     so in dev you can hit `mongodb://localhost:27017` and `redis://localhost:6379` directly from your machine.
+   Without that overlay, Mongo and Redis are only reachable on the Docker network (fine for the **app** container in full `docker compose up`, but not for Node on your machine). The same command also lets you use host tools (`mongosh`, Redis GUI clients) on `localhost`.
 
 2. Backend dev:
 

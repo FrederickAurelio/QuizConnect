@@ -175,6 +175,12 @@ function buildPlayerQuery(userId: string) {
   };
 }
 
+/** AI caches must not be sent on history detail; explanations load via POST /explain only. */
+function stripAnswerAiExplanation<T extends { aiExplanation?: unknown }>(a: T) {
+  const { aiExplanation: _omit, ...rest } = a;
+  return rest;
+}
+
 // ---------------- GET HISTORY DETAIL ----------------
 export const getHistoryDetail = async (req: Request, res: Response) => {
   try {
@@ -285,6 +291,8 @@ export const getHistoryDetail = async (req: Request, res: Response) => {
         $project: {
           hostUser: 0,
           playerUsers: 0,
+          hostAiExplanations: 0,
+          hostAiAnalytics: 0,
         },
       },
     ]);
@@ -302,32 +310,10 @@ export const getHistoryDetail = async (req: Request, res: Response) => {
     let myAnswer = null;
     let playersAnswer = null;
 
-    if (String(historyData?.host?._id) === String(userId)) {
-      // const allPlayers = await HistoryPlayerResult.find({
-      //   gameId: historyData._id,
-      // })
-      //   .select({
-      //     _id: 0,
-      //     gameId: 0,
-      //     player: 1,
-      //     answers: 1,
-      //     totalScore: 0,
-      //     rank: 0,
-      //   })
-      //   .lean();
+    const isHost = String(historyData?.host?._id) === String(userId);
+    const isHostWhoPlayed = isHost && historyData?.settings?.hostCanPlay;
 
-      // const count = historyData.quiz.questions.length;
-      // const result: any[][] = Array.from({ length: count }, () => []);
-
-      // allPlayers.forEach((player) => {
-      //   player.answers.forEach((answer) => {
-      //     const index = Number(answer.questionIndex);
-
-      //     if (Number.isInteger(index) && index >= 0 && index < result.length) {
-      //       result[index]!.push(answer);
-      //     }
-      //   });
-      // });
+    if (isHost) {
       const allPlayers = await HistoryPlayerResult.aggregate([
         { $match: { gameId: historyData._id } },
         { $unwind: "$answers" },
@@ -361,7 +347,9 @@ export const getHistoryDetail = async (req: Request, res: Response) => {
       });
 
       playersAnswer = result;
-    } else {
+    }
+
+    if (!isHost || isHostWhoPlayed) {
       const myPlayer = await HistoryPlayerResult.findOne({
         gameId: historyData._id,
         ...buildPlayerQuery(userId as any),
@@ -373,9 +361,9 @@ export const getHistoryDetail = async (req: Request, res: Response) => {
         })
         .lean();
 
-      myAnswer = (myPlayer?.answers ?? []).sort(
-        (a, b) => a.questionIndex - b.questionIndex
-      );
+      myAnswer = (myPlayer?.answers ?? [])
+        .map((a) => stripAnswerAiExplanation(a))
+        .sort((a, b) => a.questionIndex - b.questionIndex);
     }
 
     return res.status(200).json({

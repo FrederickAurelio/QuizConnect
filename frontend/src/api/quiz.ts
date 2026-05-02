@@ -6,6 +6,8 @@ export type QuizBackend = Quiz & {
   draft: boolean;
   _id?: string;
   updatedAt?: string;
+  revertable?: boolean;
+  hasQuizDraft?: boolean;
 };
 
 // Lightweight quiz item returned from backend
@@ -14,6 +16,7 @@ export type QuizListItem = {
   title: string;
   description: string;
   draft: boolean;
+  hasQuizDraft?: boolean;
   questionCount: number;
   updatedAt: string;
 };
@@ -39,8 +42,14 @@ export const deleteQuiz = async (quizId: string) => {
   return res.data;
 };
 
-export const copyQuiz = async (quizId: string) => {
-  const res = await api.post<ApiResponse<QuizBackend>>(`/quiz/copy/${quizId}`);
+export const copyQuiz = async (
+  quizId: string,
+  options?: { useDraft?: boolean },
+) => {
+  const q = options?.useDraft === true ? "?useDraft=true" : "";
+  const res = await api.post<ApiResponse<QuizBackend>>(
+    `/quiz/copy/${quizId}${q}`,
+  );
   return res.data;
 };
 
@@ -63,5 +72,12 @@ export const getQuizzes = async ({
 
 export const getDetailQuiz = async (quizId: string) => {
   const res = await api.get<ApiResponse<QuizBackend>>(`/quiz/${quizId}`);
+  return res.data;
+};
+
+export const revertDraft = async (quizId: string) => {
+  const res = await api.delete<ApiResponse<QuizBackend>>(
+    `/quiz/draft/${quizId}`,
+  );
   return res.data;
 };

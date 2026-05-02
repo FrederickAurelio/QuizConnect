@@ -1,6 +1,13 @@
+import { postHistoryQuestionExplain } from "@/api/history";
 import type { AnswerLog, LobbyState } from "@/api/sessions";
 import { Avatar, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   Tooltip,
   TooltipContent,
@@ -8,12 +15,48 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useLogin } from "@/contexts/login-context";
+import { handleGeneralError } from "@/lib/axios";
 import { socket } from "@/lib/socket";
 import { useGameCountdown } from "@/pages/game-page/useGameCountdown";
+import { useMutation } from "@tanstack/react-query";
 import { AvatarFallback } from "@radix-ui/react-avatar";
 import clsx from "clsx";
-import { AlarmClock, Check, CheckCircle2, XCircle } from "lucide-react";
-import { useMemo, type Dispatch, type SetStateAction } from "react";
+import {
+  AlarmClock,
+  Check,
+  CheckCircle2,
+  Loader2,
+  Sparkles,
+  XCircle,
+} from "lucide-react";
+import { useMemo, useState, type Dispatch, type SetStateAction } from "react";
+import dayjs from "dayjs";
+
+const MAX_EXPLAIN_POLL_ATTEMPTS = 3;
+const DEFAULT_EXPLAIN_RETRY_MS = 1000;
+
+async function fetchExplainWithRetry(
+  gameId: string,
+  questionIndex: number,
+  viewAs?: "host" | "player",
+) {
+  for (let attempt = 0; attempt < MAX_EXPLAIN_POLL_ATTEMPTS; attempt += 1) {
+    const response = await postHistoryQuestionExplain(gameId, {
+      questionIndex,
+      viewAs,
+    });
+    if (response.data?.status !== "processing") {
+      return response;
+    }
+
+    const retryAfterMs = response.data.retryAfterMs ?? DEFAULT_EXPLAIN_RETRY_MS;
+    await new Promise((resolve) => setTimeout(resolve, retryAfterMs));
+  }
+
+  throw new Error(
+    "Explanation is still generating. Please try again in a moment.",
+  );
+}
 
 function TimeHeader({
   startTime,
@@ -44,6 +87,148 @@ function TimeHeader({
   );
 }
 
+function AiExplainControl({
+  gameId,
+  questionIndex,
+  viewAs,
+}: {
+  gameId: string;
+  questionIndex: number;
+  viewAs?: "host" | "player";
+}) {
+  const [open, setOpen] = useState(false);
+  const mutation = useMutation({
+    mutationFn: () => fetchExplainWithRetry(gameId, questionIndex, viewAs),
+    onError: handleGeneralError,
+  });
+
+  const handleOpenChange = (next: boolean) => {
+    setOpen(next);
+    if (!next) return;
+    if (mutation.isPending) return;
+    if (mutation.data?.data) return;
+    mutation.mutate();
+  };
+
+  const envelope = mutation.data?.data?.explanation;
+  const verifiedAnswerLabel =
+    envelope?.payload.verifiedCorrectKey === "NONE"
+      ? "No valid option"
+      : envelope?.payload.verifiedCorrectKey;
+
+  return (
+    <Popover open={open} onOpenChange={handleOpenChange}>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="border-primary/30 gap-1.5 text-xs font-semibold"
+        >
+          <Sparkles className="size-3.5" />
+          AI explain
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent
+        align="center"
+        className="border-border scroll-primary max-h-[min(70vh,32rem)] w-[min(100vw-2rem,28rem)] overflow-y-auto"
+      >
+        {mutation.isPending && (
+          <div className="flex items-center gap-2 text-sm text-white/80">
+            <Loader2 className="size-4 shrink-0 animate-spin" />
+            Generating explanation…
+          </div>
+        )}
+        {mutation.isError && (
+          <div className="space-y-3 text-sm">
+            <p className="text-white/70">Could not load the explanation.</p>
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              disabled={mutation.isPending}
+              onClick={() => mutation.mutate()}
+            >
+              Try again
+            </Button>
+          </div>
+        )}
+        {envelope && !mutation.isPending && (
+          <div className="space-y-4 text-left text-sm text-white/90">
+            {mutation.data?.data?.cached && (
+              <p className="text-xs text-white/40">Saved explanation</p>
+            )}
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <span className="rounded-md bg-white/10 px-2 py-0.5">
+                Verified answer: {verifiedAnswerLabel}
+              </span>
+              {envelope.payload.verifiedCorrectKey === "NONE" && (
+                <span className="rounded-md bg-rose-500/20 px-2 py-0.5 text-rose-100">
+                  None of the options is correct
+                </span>
+              )}
+              <span
+                className={clsx(
+                  "rounded-md px-2 py-0.5",
+                  envelope.payload.agreesWithQuizKey
+                    ? "bg-emerald-500/20 text-emerald-200"
+                    : "bg-amber-500/20 text-amber-100",
+                )}
+              >
+                {envelope.payload.agreesWithQuizKey
+                  ? "Matches quiz key"
+                  : "Quiz key may be wrong"}
+              </span>
+            </div>
+            <div>
+              <h3 className="mb-1 text-xs font-bold tracking-wide text-white/50 uppercase">
+                Rationale
+              </h3>
+              <p className="wrap-break-word whitespace-pre-wrap text-white/85">
+                {envelope.payload.rationale}
+              </p>
+            </div>
+            <div>
+              <h3 className="mb-1 text-xs font-bold tracking-wide text-white/50 uppercase">
+                Feedback
+              </h3>
+              <p className="wrap-break-word whitespace-pre-wrap text-white/85">
+                {envelope.payload.feedback}
+              </p>
+            </div>
+            <div>
+              <h3 className="mb-1 text-xs font-bold tracking-wide text-white/50 uppercase">
+                Sources
+              </h3>
+              <ul className="list-inside list-disc space-y-1 text-white/75">
+                {envelope.payload.sources.map((s, i) => (
+                  <li key={i}>
+                    <span className="font-medium wrap-break-word text-white/90">
+                      {s.title}
+                    </span>
+                    <span className="wrap-break-word text-white/50">
+                      {" "}
+                      — {s.urlOrNote}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div className="mb-1 flex flex-wrap items-center gap-2 border-t border-white/10 pt-4 pl-0.5 text-xs text-white/50">
+              <span className="truncate">
+                Model: <span className="text-white/70">{envelope.model}</span>
+              </span>
+              <span className="text-white/40">
+                {dayjs(envelope.createdAt).format("MMM D, YYYY h:mm A")}
+              </span>
+            </div>
+          </div>
+        )}
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 type QuestionContentProp = {
   questionIndex: number;
   curQuestion: LobbyState["quiz"]["curQuestion"];
@@ -52,6 +237,12 @@ type QuestionContentProp = {
   isHost: boolean;
   groupedAnswers: GroupedAnswers;
   onAnswerSubmit?: (optionIndex: number, key: "A" | "B" | "C" | "D") => void;
+  /** History review: signed-in host or player in this game; requires `historyGameId`. */
+  aiExplainEnabled?: boolean;
+  /** When explain is disabled in history, show muted button + tooltip (e.g. not signed in / not in game). */
+  aiExplainDisabledReason?: string;
+  historyGameId?: string;
+  viewAs?: "host" | "player";
 };
 
 export function QuestionContent({
@@ -62,16 +253,83 @@ export function QuestionContent({
   isHost,
   groupedAnswers,
   onAnswerSubmit,
+  aiExplainEnabled = false,
+  aiExplainDisabledReason,
+  historyGameId,
+  viewAs,
 }: QuestionContentProp) {
   const resultAnswer = isResult ? curQuestion?.correctKey : null;
   const isCorrect = resultAnswer === isAnswered;
+  const isUnanswered = !isAnswered;
+  const isHistoryPlayerView =
+    isResult && !!historyGameId && viewAs === "player" && !isHost;
+
+  const answerOutcome = isUnanswered
+    ? {
+        label: "Didn't answer",
+        className: "border-amber-500/50 bg-amber-500/10 text-amber-300",
+      }
+    : isCorrect
+      ? {
+          label: "Correct",
+          className: "border-emerald-500/50 bg-emerald-500/10 text-emerald-300",
+        }
+      : {
+          label: "Wrong",
+          className: "border-destructive/50 bg-destructive/10 text-destructive",
+        };
 
   return (
     <>
-      <div className="flex flex-col items-center gap-4 text-center">
-        <span className="bg-primary/10 text-primary rounded-full px-4 py-1 text-xs font-black uppercase">
-          Question {questionIndex + 1}
-        </span>
+      <div className="flex w-full flex-col items-center gap-4 text-center">
+        <div className="flex w-full flex-wrap items-center justify-center gap-3">
+          <span className="bg-primary/10 text-primary rounded-full px-4 py-1 text-xs font-black uppercase">
+            Question {questionIndex + 1}
+          </span>
+          {isResult && historyGameId && aiExplainEnabled && (
+            <AiExplainControl
+              key={viewAs}
+              gameId={historyGameId}
+              questionIndex={questionIndex}
+              viewAs={viewAs}
+            />
+          )}
+          {isResult && historyGameId && !aiExplainEnabled && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span
+                  tabIndex={0}
+                  className="focus-visible:ring-ring/50 inline-flex cursor-not-allowed rounded-md outline-none focus-visible:ring-[3px]"
+                >
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled
+                    className="border-primary/30 pointer-events-none gap-1.5 text-xs font-semibold opacity-50"
+                  >
+                    <Sparkles className="size-3.5" />
+                    AI explain
+                  </Button>
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="max-w-xs text-balance">
+                {aiExplainDisabledReason ??
+                  "AI explain is unavailable for this session."}
+              </TooltipContent>
+            </Tooltip>
+          )}
+          {isHistoryPlayerView && (
+            <span
+              className={clsx(
+                "rounded-full border px-3 py-1 text-xs font-black uppercase",
+                answerOutcome.className,
+              )}
+            >
+              {answerOutcome.label}
+            </span>
+          )}
+        </div>
         <h1 className="balance text-3xl font-extrabold md:text-4xl">
           {curQuestion?.question ?? ""}
         </h1>
@@ -79,6 +337,7 @@ export function QuestionContent({
       <div className="grid w-full grid-cols-1 gap-4 md:grid-cols-2">
         {curQuestion?.options.map((option, index) => {
           const selected = isAnswered === option.key;
+          const isCorrectOption = option.key === resultAnswer;
 
           const buttonClass = clsx(
             "flex flex-col justify-center min-h-[100px] rounded-2xl border-2 p-6 transition-all active:scale-[0.98]",
@@ -87,8 +346,10 @@ export function QuestionContent({
                 ? "border-primary bg-primary/10"
                 : selected && !isCorrect
                   ? "border-destructive/50 bg-destructive/10"
-                  : (selected && isCorrect) || option.key === resultAnswer
-                    ? "border-emerald-500/50 bg-emerald-500/10"
+                  : (selected && isCorrect) || isCorrectOption
+                    ? isUnanswered && !isHost
+                      ? "border-amber-500/50 bg-amber-500/10"
+                      : "border-emerald-500/50 bg-emerald-500/10"
                     : "border-border bg-card opacity-50 grayscale-[0.5]"
               : "bg-primary/10 hover:border-primary/50 hover:bg-secondary/50",
           );
@@ -102,26 +363,28 @@ export function QuestionContent({
             >
               <div className="flex w-full items-center justify-between">
                 <div className="flex items-center gap-4">
-                  <div className="bg-secondary flex size-10 items-center justify-center rounded-lg font-black">
+                  <div className="bg-secondary flex size-10 shrink-0 items-center justify-center rounded-lg font-black">
                     {String.fromCharCode(65 + index)}
                   </div>
-                  <span className="text-lg font-bold">{option.text}</span>
+                  <span className="text-left text-lg font-bold">
+                    {option.text}
+                  </span>
                 </div>
 
                 {selected && !isResult && (
-                  <div className="bg-primary animate-in zoom-in flex size-6 items-center justify-center rounded-full">
+                  <div className="bg-primary animate-in zoom-in flex size-6 shrink-0 items-center justify-center rounded-full">
                     <Check strokeWidth={3} className="size-4 text-black" />
                   </div>
                 )}
 
                 {isResult && selected && !isCorrect && (
-                  <div className="bg-destructive/50 animate-in zoom-in flex size-6 items-center justify-center rounded-full">
+                  <div className="bg-destructive/50 animate-in zoom-in flex size-6 shrink-0 items-center justify-center rounded-full">
                     <XCircle strokeWidth={3} className="size-4 text-black" />
                   </div>
                 )}
 
                 {isResult && selected && isCorrect && (
-                  <div className="animate-in zoom-in flex size-6 items-center justify-center rounded-full bg-emerald-500/50">
+                  <div className="animate-in zoom-in flex size-6 shrink-0 items-center justify-center rounded-full bg-emerald-500/50">
                     <CheckCircle2
                       strokeWidth={3}
                       className="size-4 text-black"
@@ -181,6 +444,7 @@ type QuestionPageProps = {
   myAnswer: AnswerLog[] | null | undefined;
   setMyAnswer: Dispatch<SetStateAction<AnswerLog[] | null | undefined>>;
   playersAnswer: AnswerLog[];
+  hostCanPlay?: boolean;
 };
 
 type AddonAnswerLog = AnswerLog & { username: string; avatar: string };
@@ -199,9 +463,12 @@ function QuestionPage({
   myAnswer,
   setMyAnswer,
   playersAnswer,
+  hostCanPlay,
 }: QuestionPageProps) {
   const { user } = useLogin();
   const isHost = user?.userId === host._id;
+  const canAnswer = !isHost || !!hostCanPlay;
+  const canSeeDashboard = isHost && !hostCanPlay;
 
   const questionIndex = gameState.questionIndex;
   const answerForThisQuestion = (myAnswer ?? []).at(questionIndex);
@@ -244,7 +511,7 @@ function QuestionPage({
   }, [playersAnswer, playerMap]);
 
   function onAnswerSubmit(optionIndex: number, key: "A" | "B" | "C" | "D") {
-    if (isHost) return;
+    if (!canAnswer) return;
 
     socket.emit(
       "submit-answer",
@@ -267,8 +534,12 @@ function QuestionPage({
           "border-amber-500/50 bg-amber-500/10 text-amber-600 dark:text-amber-400",
         iconBg: "bg-amber-500",
         icon: <AlarmClock className="size-6" />,
-        title: isAllPlayerAnswered ? "All players answered!" : "Time's Up!",
-        desc: isHost
+        title: canSeeDashboard
+          ? isAllPlayerAnswered
+            ? "All players answered!"
+            : "Time's Up!"
+          : "Time's Up!",
+        desc: canSeeDashboard
           ? `${resultAnswer ? groupedAnswers[resultAnswer].length : 0} players answer correctly!`
           : "You didn't select an answer in time.",
       }
@@ -332,7 +603,7 @@ function QuestionPage({
         curQuestion={curQuestion}
         isAnswered={isAnswered}
         isResult={isResult}
-        isHost={isHost}
+        isHost={canSeeDashboard}
         groupedAnswers={groupedAnswers}
         onAnswerSubmit={onAnswerSubmit}
       />

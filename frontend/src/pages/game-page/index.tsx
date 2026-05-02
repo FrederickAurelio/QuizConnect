@@ -27,6 +27,7 @@ function GamePage({ lobby, playersAnswer, myAnswer }: GamePageProps) {
       myAnswer={localMyAnswer}
       setMyAnswer={setLocalMyAnswer}
       playersAnswer={playersAnswer}
+      hostCanPlay={lobby.settings.hostCanPlay}
     />
   );
 

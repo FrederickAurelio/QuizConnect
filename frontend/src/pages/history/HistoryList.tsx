@@ -153,7 +153,9 @@ function HistoryList() {
           return (
             <div
               onClick={() => {
-                navigate(`/history/${history._id}`);
+                navigate(
+                  `/history/${history._id}?viewAs=${option === "host" ? "host" : "player"}`,
+                );
               }}
               key={history._id}
               className={clsx(

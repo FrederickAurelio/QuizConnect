@@ -27,7 +27,7 @@ function LobbyPageRouting({ lobby: lobbyProps }: { lobby: LobbyState }) {
     !!gameCode &&
     !!lobbyState &&
     lobbyState?.status !== "lobby" &&
-    lobbyState.host._id !== user?.userId;
+    (lobbyState.host._id !== user?.userId || lobbyState.settings.hostCanPlay);
 
   const { data: myAnswerRes } = useQuery({
     queryKey: ["YourAnswer", gameCode, user?.userId],

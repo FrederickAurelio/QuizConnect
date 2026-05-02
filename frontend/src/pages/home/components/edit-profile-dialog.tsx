@@ -21,7 +21,7 @@ import { socket } from "@/lib/socket";
 import { useMutation } from "@tanstack/react-query";
 import clsx from "clsx";
 import { Pencil, SaveAll } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams } from "react-router";
 import { toast } from "sonner";
 
@@ -39,6 +39,16 @@ function EditProfileDialog({ open, onOpenChange }: Props) {
     avatar: user?.avatar ?? "",
     username: user?.username ?? "",
   });
+
+  useEffect(() => {
+    if (open) {
+      setData({
+        avatar: user?.avatar ?? "",
+        username: user?.username ?? "",
+      });
+    }
+  }, [open, user?.avatar, user?.username]);
+
   const isInvalid =
     (data.username ?? "").length < 3 || (data.username ?? "").length > 50;
 
@@ -62,7 +72,7 @@ function EditProfileDialog({ open, onOpenChange }: Props) {
         avatar: user?.avatar,
         username: user?.username,
       });
-    }, 1000);
+    }, 300);
 
     if (gameCode) {
       socket.emit("update-profile", {
