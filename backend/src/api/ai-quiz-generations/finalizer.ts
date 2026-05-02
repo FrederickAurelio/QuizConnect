@@ -6,7 +6,7 @@ import {
 } from "./prompts.js";
 import {
   type FinalizeLlmOutput,
-  buildFinalizeOutputSchema,
+  buildFinalizeSelectionOutputSchema,
 } from "./schemas.js";
 import {
   completeChatJson,
@@ -26,19 +26,46 @@ export async function runFinalizeLlm(params: {
   candidates: ChunkLlmOutput["questions"];
 }): Promise<{ output: FinalizeLlmOutput; model: string }> {
   const model = quizGenModel();
-  const schema = buildFinalizeOutputSchema(params.questionCount);
+  const candidateCount = params.candidates.length;
+  const selectionSchema = buildFinalizeSelectionOutputSchema(
+    params.questionCount,
+    candidateCount,
+  );
+
   const candidateJson = JSON.stringify(
-    { questions: params.candidates },
+    {
+      candidates: params.candidates.map((q, index) => ({
+        index,
+        question: q.question,
+        options: q.options,
+        correctKey: q.correctKey,
+        ...(q.rationale !== undefined ? { rationale: q.rationale } : {}),
+        ...(q.difficulty !== undefined ? { difficulty: q.difficulty } : {}),
+        ...(q.tags !== undefined ? { tags: q.tags } : {}),
+      })),
+    },
     null,
     2,
   );
+
   const userContent = buildFinalizeUserPrompt({
     finalCount: params.questionCount,
+    candidateCount,
     language: params.language,
     difficulty: params.difficulty,
     extraRules: params.extraRules,
     candidateJson,
   });
+
+  const repairSuffix =
+    "Your previous output was invalid or did not validate. Reply with exactly one JSON object matching: " +
+    FINALIZE_JSON_SHAPE_PREFIX +
+    `. The selectedQuestionIndexes array MUST have length exactly ${params.questionCount}, ` +
+    `with UNIQUE integers only, each between 0 and ${Math.max(
+      0,
+      candidateCount - 1,
+    )} inclusive (candidate indices). ` +
+    "Return JSON only.";
 
   let { content } = await completeChatJson({
     model,
@@ -48,7 +75,7 @@ export async function runFinalizeLlm(params: {
     ],
   });
 
-  let parsed = parseJsonWithOptionalFence(content, schema);
+  let parsed = parseJsonWithOptionalFence(content, selectionSchema);
   if (!parsed) {
     ({ content } = await completeChatJson({
       model,
@@ -56,16 +83,10 @@ export async function runFinalizeLlm(params: {
         { role: "system", content: FINALIZE_SYSTEM_PROMPT },
         { role: "user", content: userContent },
         { role: "assistant", content },
-        {
-          role: "user",
-          content:
-            "Your previous output was invalid. Reply with exactly one JSON object matching: " +
-            FINALIZE_JSON_SHAPE_PREFIX +
-            `. questions array must have length exactly ${params.questionCount}.`,
-        },
+        { role: "user", content: repairSuffix },
       ],
     }));
-    parsed = parseJsonWithOptionalFence(content, schema);
+    parsed = parseJsonWithOptionalFence(content, selectionSchema);
   }
 
   if (!parsed) {
@@ -74,5 +95,23 @@ export async function runFinalizeLlm(params: {
     throw err;
   }
 
-  return { output: parsed, model };
+  const questions = parsed.selectedQuestionIndexes.map((i) => {
+    const q = params.candidates[i];
+    if (!q) {
+      const err = new Error(
+        `Finalize index ${i} out of range after validation (candidateCount=${candidateCount}).`,
+      );
+      (err as { statusCode?: number }).statusCode = 502;
+      throw err;
+    }
+    return q;
+  });
+
+  const output: FinalizeLlmOutput = {
+    title: parsed.title.trim(),
+    description: (parsed.description ?? "").trim(),
+    questions,
+  };
+
+  return { output, model };
 }

@@ -109,96 +109,78 @@ Return JSON only.`;
 
 export const CHUNK_JSON_SHAPE = `{"decision":{"isUsable":boolean,"reason":string},"questions":[{"question":string,"options":[{"key":"A"|"B"|"C"|"D","text":string},...4],"correctKey":"A"|"B"|"C"|"D","rationale":string,"difficulty":"easy"|"medium"|"hard","tags":[string]}]}`;
 
-export const FINALIZE_SYSTEM_PROMPT = `You are an assessment editor. Finalize a set of candidate MCQs into one publishable quiz draft.
+export const FINALIZE_SYSTEM_PROMPT = `You are an assessment editor. You CURATE candidate multiple-choice questions for one quiz.
+
+You NEVER rewrite or regenerate question stems, option text, rationales, difficulties, tags, or correct answers.
+Your ONLY job besides title/description is to choose WHICH candidate indexes to include by returning integers.
 
 Non-negotiable output rules:
-1) Output VALID JSON only. No markdown. No code fences. No comments.
-2) Return exactly one JSON object with only these top-level keys: "title", "description", "questions".
-3) The "questions" array length MUST equal the requested final count exactly.
-4) Each question must contain only these keys: "question", "options", "correctKey", "rationale", "difficulty", "tags".
-5) Each options array must contain exactly 4 items with keys A, B, C, D exactly once.
-6) correctKey must be one of A, B, C, D and must point to the single correct option.
-7) Do not add extra fields.
+1) Output VALID JSON only. No markdown. No code fences. No commentary before or after the JSON.
+2) Return exactly one JSON object with only these three top-level keys: "title", "description", "selectedQuestionIndexes".
+3) selectedQuestionIndexes is an ARRAY of integers. Its length MUST equal the requested selection count exactly.
+4) Each integer MUST be unique (no duplicates).
+5) Each integer MUST be the "index" of a candidate from the provided candidates list (zero-based — first candidate has index 0).
+6) Every integer MUST be within the inclusive range printed in the user message (typically 0 through N-1).
+7) Do not add extra top-level keys. Do not wrap content in markdown.
 
-Editing rules:
-1) Use ONLY facts present in the candidate questions. Do not invent new facts, entities, numbers, dates, causal claims, or examples.
-2) Select the strongest candidates first: grounded, standalone, useful, non-trivial, clear, and not duplicated.
-3) Remove duplicates and near-duplicates, including questions testing the same fact with different wording.
-4) Rewrite awkward wording, but preserve factual meaning.
-5) Remove all meta/source phrasing:
-   - "according to the text"
-   - "in this passage"
-   - "based on the article"
-   - "as mentioned above"
-   - any similar wording that refers to source material instead of the subject.
-6) Questions must be standalone: a learner should understand the question without seeing the source text.
-7) Prefer conceptual/comprehension questions over citation trivia, page artifacts, filenames, headers, footers, or formatting details.
-8) Keep the requested target difficulty. If candidates vary in quality, prioritize correctness and clarity over matching difficulty perfectly.
-9) Keep all final question text, options, title, and description in the requested language.
+Selection quality rules:
+1) Pick the BEST set for the learner: grounded, standalone, clearly answerable, educationally meaningful, specific, and non-redundant.
+2) Drop weak items: ambiguity, trivia about page/layout, broken or joke distractors, overlapping options where multiple answers could work, factual messiness.
+3) Drop duplicates and NEAR-duplicates testing the same fact in different wording; keep ONE clearest formulation.
+4) Prefer conceptual understanding (cause/effect, mechanism, contrast, inference) when quality is comparable.
+5) Avoid questions that heavily rely on source-meta phrasing (“according to the text”, “this passage”, “the article”), unless all candidates suffer this — still prefer cleaner items.
+6) Your title and description MUST reflect ONLY the TOPICS assessed by the INDEXES you picked (infer from those candidates’ stems and options).
 
-Option quality rules:
-1) Distractors must be plausible in-domain but clearly wrong.
-2) Avoid joke options, "all of the above", "none of the above", and overlapping options.
-3) Avoid options that differ only by tiny wording changes unless the distinction is truly meaningful.
-4) Ensure no option accidentally also satisfies the question.
+Language:
+- Title, description MUST be written in the user-specified quiz language even if stems are multilingual (then match the plurality of stems or primary language declared by the caller).
 
-Quiz metadata rules:
-1) Title must be concise, specific, and based on the candidate subject matter.
-2) Description must be one short sentence summarizing what the quiz assesses.
-3) Do not mention chunks, candidates, uploaded files, source text, AI, or generation process.`;
+Tone for metadata:
+- Title: concise (under ~80 characters when feasible), concrete topic name.
+- Description: one crisp sentence naming skills/topics tested.
+- Do NOT mention: chunks, files, uploads, passages, sourcing, prompts, indexes, selecting, ranking, AI, generation, databases, pipelines.`;
 
 export function buildFinalizeUserPrompt(params: {
   finalCount: number;
+  candidateCount: number;
   language: string;
   difficulty: string;
   extraRules: string;
   candidateJson: string;
 }): string {
-  return `Finalize these candidate MCQs into a publishable quiz draft.
+  const maxIdx = Math.max(0, params.candidateCount - 1);
+  return `You will CURATE quiz content from STRUCTURED candidates.
 
-Required final question count: ${params.finalCount}
-Required language: ${params.language}
-Target difficulty: ${params.difficulty}
+TASK
+1) Inspect every candidate listed in JSON below — each carries a ZERO-BASED "index" matching its array position starting at index 0.
+2) SELECT EXACTLY ${params.finalCount} DISTINCT indexes you want kept in the FINAL quiz ORDER (ordering is your pedagogical sequencing).
+3) WRITE "title" and "description" for the FINAL quiz AFTER you finalize which indexes matter.
 
-User style/rule request (follow only when it does not conflict with system rules):
+Hard index rules:
+- Allowed index range: integers from **0 through ${maxIdx}** inclusive (there are exactly ${params.candidateCount} candidates).
+- Emit EXACTLY ${params.finalCount} integers inside "selectedQuestionIndexes".
+- All integers MUST be UNIQUE (no duplicate picks).
+- Do NOT invent indices outside ${0}..${maxIdx}.
+
+Quiz settings:
+- Quiz language required for TITLE + DESCRIPTION ONLY: ${params.language}
+- Target difficulty context (guides what you KEEP / DROP bias): ${params.difficulty}
+
+User extra instructions (respect only if compatible with HARD rules above):
 ${params.extraRules}
 
-Candidate questions JSON:
+CANDIDATES JSON (each object includes numeric "index"):
 ${params.candidateJson}
 
-Selection instructions:
-- Choose exactly ${params.finalCount} final questions.
-- If more candidates are provided, discard weak, duplicated, ambiguous, too-easy, or source-meta questions.
-- If two candidates test the same idea, keep only the clearer and more educational one.
-- Normalize every final question so it is standalone and does not refer to "text", "passage", "article", "material", "chunk", "source", or "document".
-- Keep the answer key correct after rewriting options.
-- Keep each question concise, but do not remove necessary context.
-- Preserve or improve rationales when present; if rationale is missing, write a brief rationale grounded only in the candidate.
-- Use tags sparingly: 1-4 short subject tags per question.
+OUTPUT JSON SCHEMA — return NOTHING else:
 
-Return exactly one JSON object. It must match this shape and contain no extra keys:
 {
-  "title": string,
-  "description": string,
-  "questions": [
-    {
-      "question": string,
-      "options": [
-        { "key": "A", "text": string },
-        { "key": "B", "text": string },
-        { "key": "C", "text": string },
-        { "key": "D", "text": string }
-      ],
-      "correctKey": "A"|"B"|"C"|"D",
-      "rationale": string,
-      "difficulty": "easy"|"medium"|"hard",
-      "tags": [string]
-    }
-  ]
+  "title": "<short quiz title reflecting picked topics ONLY>",
+  "description": "<one sentence describing what learner is assessed on>",
+  "selectedQuestionIndexes": [idx1, idx2, ...exactly_${params.finalCount}_total...]
 }
 
-The questions array must contain exactly ${params.finalCount} items. Return JSON only.`;
+Return JSON only — no preamble, no fences.`;
 }
 
 export const FINALIZE_JSON_SHAPE_PREFIX =
-  '{"title":string,"description":string,"questions":[...]}';
+  '{"title":string,"description":string,"selectedQuestionIndexes":[number,...]}';
