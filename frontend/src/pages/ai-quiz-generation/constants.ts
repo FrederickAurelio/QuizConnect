@@ -13,9 +13,9 @@ export const QUESTION_COUNT_CHOICES: readonly number[] = Array.from(
 export const MAX_PREPARED_MATERIALS = 3;
 
 /** Max upload size per prepared file (must match backend multer + controller). */
-export const MAX_PREPARED_FILE_BYTES = 5 * 1024 * 1024;
+export const MAX_PREPARED_FILE_BYTES = 8 * 1024 * 1024;
 
-export const MAX_PREPARED_FILE_LABEL = "5MB";
+export const MAX_PREPARED_FILE_LABEL = "8MB";
 
 /** Poll generation detail while status is PROCESSING (jobs often take minutes). */
 export const AI_GENERATION_DETAIL_POLL_MS = 20_000;
