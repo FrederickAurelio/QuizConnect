@@ -135,8 +135,8 @@ function HistoryList() {
           const isWinner =
             (history.winner?.userId || history.winner?.guestId) ===
             user?.userId;
-          const isHost = history.host._id === user?.userId;
-          const showVictoryState = isWinner || isHost;
+          const viewAsHost = option === "host";
+          const showVictoryState = isWinner || viewAsHost;
 
           const rank = history?.myResult?.[0]?.rank;
           const rankIndex = Math.max((rank ?? 1) - 1, 0);
@@ -224,7 +224,7 @@ function HistoryList() {
                       </AvatarFallback>
                     </Avatar>
                     <p className="pt-px text-center text-base font-semibold break-all text-yellow-500/80">
-                      {isHost ? history.winner?.username : "VICTORY"}
+                      {viewAsHost ? history.winner?.username : "VICTORY"}
                     </p>
                     <p className="text-sm font-semibold text-white/90">
                       {history.winner?.totalScore}pts
