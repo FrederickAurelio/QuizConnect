@@ -98,12 +98,12 @@ export async function sendVerificationEmail({
   email,
   verificationCode,
 }: SendVerificationEmailOptions): Promise<unknown> {
-  const senderName = "QuizzConnect";
+  const senderName = "QuizConnect";
 
   const htmlContent = `
         <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
             <p>Hello,</p>
-            <p>Your verification code for QuizzConnect is:</p>
+            <p>Your verification code for QuizConnect is:</p>
             <div style="background-color: #f4f4f4; padding: 15px; border-radius: 8px; text-align: center; margin: 20px 0;">
                 <h2 style="color: #2E7D32; letter-spacing: 5px; margin: 0; font-size: 24px;">
                     <strong>${verificationCode}</strong>
