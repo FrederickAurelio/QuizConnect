@@ -349,7 +349,7 @@ export function QuestionContent({
                 : selected && !isCorrect
                   ? "border-destructive/50 bg-destructive/10"
                   : (selected && isCorrect) || isCorrectOption
-                    ? isUnanswered && !isHost
+                    ? isUnanswered && partOfTheGame && !isHost
                       ? "border-amber-500/50 bg-amber-500/10"
                       : "border-emerald-500/50 bg-emerald-500/10"
                     : "border-border bg-card opacity-50 grayscale-[0.5]"
