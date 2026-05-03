@@ -27,6 +27,7 @@ function QuestionWrapper({
   aiExplainEnabled,
   aiExplainDisabledReason,
   viewAs,
+  partOfTheGame = false,
 }: {
   quesionIndex: number;
   curQuestion: Question;
@@ -40,6 +41,7 @@ function QuestionWrapper({
   aiExplainEnabled: boolean;
   aiExplainDisabledReason?: string;
   viewAs?: "host" | "player";
+  partOfTheGame?: boolean;
 }) {
   const isAnswered = myAnswer?.key;
 
@@ -82,6 +84,7 @@ function QuestionWrapper({
           aiExplainDisabledReason={aiExplainDisabledReason}
           historyGameId={gameId}
           viewAs={viewAs}
+          partOfTheGame={partOfTheGame}
         />
       </div>
       <hr className="my-8 w-full border-white/10" />
@@ -261,11 +264,10 @@ function HistoryDetail() {
               ).map((tab) => (
                 <div
                   key={tab.key}
-                  className={`w-16 cursor-default py-1 text-center text-sm font-semibold transition-colors duration-100 ${
-                    viewMode === tab.key
-                      ? "bg-border text-secondary-foreground rounded-md"
-                      : "text-white/40"
-                  }`}
+                  className={`w-16 cursor-default py-1 text-center text-sm font-semibold transition-colors duration-100 ${viewMode === tab.key
+                    ? "bg-border text-secondary-foreground rounded-md"
+                    : "text-white/40"
+                    }`}
                   onClick={() => setViewMode(tab.key)}
                 >
                   {tab.label}
@@ -319,11 +321,10 @@ function HistoryDetail() {
           <div
             key={idx}
             id={`history-question-${idx}`}
-            className={`w-full max-w-[850px] rounded-xl transition-shadow duration-300 ${
-              highlightedQuestionIndex === idx
-                ? "ring-primary/45 ring-2 ring-offset-2 ring-offset-transparent"
-                : ""
-            }`}
+            className={`w-full max-w-[850px] rounded-xl transition-shadow duration-300 ${highlightedQuestionIndex === idx
+              ? "ring-primary/45 ring-2 ring-offset-2 ring-offset-transparent"
+              : ""
+              }`}
           >
             <QuestionWrapper
               quesionIndex={idx}
@@ -335,6 +336,7 @@ function HistoryDetail() {
               gameId={gameId}
               aiExplainEnabled={aiFeaturesEnabled}
               aiExplainDisabledReason={aiFeatureDisabledReason}
+              partOfTheGame={partOfTheGame}
               viewAs={showViewToggle ? viewMode : undefined}
             />
           </div>

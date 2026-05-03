@@ -11,7 +11,7 @@ export const OPENROUTER_MODEL =
 export const OPENROUTER_WEB_DECIDER_MODEL =
   process.env.OPENROUTER_WEB_DECIDER_MODEL?.trim() || OPENROUTER_MODEL;
 const OPENROUTER_HTTP_REFERER = process.env.OPENROUTER_HTTP_REFERER || "";
-const OPENROUTER_APP_TITLE = process.env.OPENROUTER_APP_TITLE || "QuizGame";
+const OPENROUTER_APP_TITLE = process.env.OPENROUTER_APP_TITLE || "QuizConnect";
 
 export type OpenRouterMessage = {
   role: "system" | "user" | "assistant";

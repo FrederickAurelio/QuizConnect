@@ -243,6 +243,7 @@ type QuestionContentProp = {
   aiExplainDisabledReason?: string;
   historyGameId?: string;
   viewAs?: "host" | "player";
+  partOfTheGame?: boolean;
 };
 
 export function QuestionContent({
@@ -257,6 +258,7 @@ export function QuestionContent({
   aiExplainDisabledReason,
   historyGameId,
   viewAs,
+  partOfTheGame = false,
 }: QuestionContentProp) {
   const resultAnswer = isResult ? curQuestion?.correctKey : null;
   const isCorrect = resultAnswer === isAnswered;
@@ -266,18 +268,18 @@ export function QuestionContent({
 
   const answerOutcome = isUnanswered
     ? {
-        label: "Didn't answer",
-        className: "border-amber-500/50 bg-amber-500/10 text-amber-300",
-      }
+      label: "Didn't answer",
+      className: "border-amber-500/50 bg-amber-500/10 text-amber-300",
+    }
     : isCorrect
       ? {
-          label: "Correct",
-          className: "border-emerald-500/50 bg-emerald-500/10 text-emerald-300",
-        }
+        label: "Correct",
+        className: "border-emerald-500/50 bg-emerald-500/10 text-emerald-300",
+      }
       : {
-          label: "Wrong",
-          className: "border-destructive/50 bg-destructive/10 text-destructive",
-        };
+        label: "Wrong",
+        className: "border-destructive/50 bg-destructive/10 text-destructive",
+      };
 
   return (
     <>
@@ -319,7 +321,7 @@ export function QuestionContent({
               </TooltipContent>
             </Tooltip>
           )}
-          {isHistoryPlayerView && (
+          {partOfTheGame && (isHistoryPlayerView || !isHost) && (
             <span
               className={clsx(
                 "rounded-full border px-3 py-1 text-xs font-black uppercase",
@@ -530,35 +532,35 @@ function QuestionPage({
   }
   const resultTheme = !isAnswered
     ? {
-        container:
-          "border-amber-500/50 bg-amber-500/10 text-amber-600 dark:text-amber-400",
-        iconBg: "bg-amber-500",
-        icon: <AlarmClock className="size-6" />,
-        title: canSeeDashboard
-          ? isAllPlayerAnswered
-            ? "All players answered!"
-            : "Time's Up!"
-          : "Time's Up!",
-        desc: canSeeDashboard
-          ? `${resultAnswer ? groupedAnswers[resultAnswer].length : 0} players answer correctly!`
-          : "You didn't select an answer in time.",
-      }
+      container:
+        "border-amber-500/50 bg-amber-500/10 text-amber-600 dark:text-amber-400",
+      iconBg: "bg-amber-500",
+      icon: <AlarmClock className="size-6" />,
+      title: canSeeDashboard
+        ? isAllPlayerAnswered
+          ? "All players answered!"
+          : "Time's Up!"
+        : "Time's Up!",
+      desc: canSeeDashboard
+        ? `${resultAnswer ? groupedAnswers[resultAnswer].length : 0} players answer correctly!`
+        : "You didn't select an answer in time.",
+    }
     : isCorrect
       ? {
-          container:
-            "border-emerald-500/50 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
-          iconBg: "bg-emerald-500",
-          icon: <CheckCircle2 className="size-6" />,
-          title: "Correct Answer",
-          desc: "Great job! Keep the momentum going.",
-        }
+        container:
+          "border-emerald-500/50 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+        iconBg: "bg-emerald-500",
+        icon: <CheckCircle2 className="size-6" />,
+        title: "Correct Answer",
+        desc: "Great job! Keep the momentum going.",
+      }
       : {
-          container: "border-destructive/50 bg-destructive/10 text-destructive",
-          iconBg: "bg-destructive",
-          icon: <XCircle className="size-6" />,
-          title: "Incorrect",
-          desc: "Don't worry, try the next one!",
-        };
+        container: "border-destructive/50 bg-destructive/10 text-destructive",
+        iconBg: "bg-destructive",
+        icon: <XCircle className="size-6" />,
+        title: "Incorrect",
+        desc: "Don't worry, try the next one!",
+      };
 
   /* ---------------- Render ---------------- */
 
