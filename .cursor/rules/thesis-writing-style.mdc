@@ -1,0 +1,32 @@
+---
+description: Thesis writing style for real-time multiplayer quiz platform documentation
+globs: zthesis/**/*.md
+alwaysApply: false
+---
+
+# Thesis Writing Style
+
+When writing thesis content in `zthesis/**/*.md`, use the user's natural thesis style:
+
+- Write in a **technical, straightforward** tone: simple sentences, direct claims, no decorative language.
+- Use an **explanation-first** flow: explain the concept first, then describe the implementation detail.
+- Prefer step-by-step system explanations, for example: user action -> server validation -> Redis/MongoDB update -> client response.
+- Keep structure logical: define the concept, identify roles/modules, then explain behavior.
+- Balance **description** and **analysis**: do not only list features; also state why each design choice matters.
+- Avoid repetitive paragraph openings such as “This module handles...” or “The system ensures...” in every section.
+- Avoid overclaiming. If discussing limitations, be honest about scale, AI accuracy, and evaluation scope.
+- Keep thesis prose readable for supervisors: technical enough for engineering, but not code-heavy.
+
+Preferred pattern:
+
+1. State the purpose of the component or section.
+2. Explain the flow or behavior in order.
+3. Mention the project evidence or implementation mechanism.
+4. Briefly explain why the design is useful.
+
+Avoid:
+
+- Long code blocks unless explicitly requested.
+- Marketing-style wording.
+- Repeating the same sentence pattern across adjacent paragraphs.
+- Unverified performance or educational outcome claims.
