@@ -7,7 +7,8 @@ import {
   normalizeQuestionCount,
 } from "@/pages/ai-quiz-generation/constants";
 
-const STORAGE_KEY = "ai-quiz-generation:draft-v1";
+const LEGACY_STORAGE_KEY = "ai-quiz-generation:draft-v1";
+const STORAGE_KEY_PREFIX = "ai-quiz-generation:draft-v2";
 
 const PREPARED_STATUSES = new Set<PreparedMaterial["status"]>([
   "PROCESSING",
@@ -28,6 +29,10 @@ export const DEFAULT_AI_SETTINGS: AiGenerationSettings = {
   language: "English",
 };
 
+function getDraftStorageKey(userId: string): string {
+  return `${STORAGE_KEY_PREFIX}:${userId}`;
+}
+
 function materialExpiresAt(m: { expiresAt: string }): number {
   return Date.parse(m.expiresAt);
 }
@@ -38,7 +43,6 @@ export function isPreparedMaterialExpired(m: PreparedMaterial): boolean {
   if (Number.isNaN(t)) return true;
   return t <= Date.now();
 }
-
 
 function isPreparedMaterial(x: unknown): x is PreparedMaterial {
   if (!x || typeof x !== "object") return false;
@@ -91,16 +95,14 @@ function parseSettings(value: unknown): AiGenerationSettings | null {
   };
 }
 
-export function loadAiGenerationDraft(): AiGenerationDraftStorage | null {
-  if (typeof window === "undefined") return null;
-  const raw = window.localStorage.getItem(STORAGE_KEY);
-  if (!raw) return null;
+function parseDraft(raw: string): AiGenerationDraftStorage | null {
   try {
     const parsed = JSON.parse(raw) as Partial<AiGenerationDraftStorage>;
     if (!parsed || typeof parsed !== "object") return null;
 
     return {
-      promptText: typeof parsed.promptText === "string" ? parsed.promptText : "",
+      promptText:
+        typeof parsed.promptText === "string" ? parsed.promptText : "",
       settings: parseSettings(parsed.settings) ?? DEFAULT_AI_SETTINGS,
       preparedMaterials: parsePreparedMaterialsList(parsed.preparedMaterials),
     };
@@ -109,12 +111,45 @@ export function loadAiGenerationDraft(): AiGenerationDraftStorage | null {
   }
 }
 
-export function saveAiGenerationDraft(data: AiGenerationDraftStorage) {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+function migrateLegacyDraft(userId: string): string | null {
+  const nextKey = getDraftStorageKey(userId);
+  const hasScopedDraft = window.localStorage.getItem(nextKey);
+  if (hasScopedDraft) return hasScopedDraft;
+
+  const legacyRaw = window.localStorage.getItem(LEGACY_STORAGE_KEY);
+  if (!legacyRaw) return null;
+
+  const parsedLegacy = parseDraft(legacyRaw);
+  if (!parsedLegacy) {
+    window.localStorage.removeItem(LEGACY_STORAGE_KEY);
+    return null;
+  }
+
+  const encoded = JSON.stringify(parsedLegacy);
+  window.localStorage.setItem(nextKey, encoded);
+  window.localStorage.removeItem(LEGACY_STORAGE_KEY);
+  return encoded;
 }
 
-export function clearAiGenerationDraft() {
+export function loadAiGenerationDraft(
+  userId: string,
+): AiGenerationDraftStorage | null {
+  if (typeof window === "undefined") return null;
+  const key = getDraftStorageKey(userId);
+  const raw = window.localStorage.getItem(key) ?? migrateLegacyDraft(userId);
+  if (!raw) return null;
+  return parseDraft(raw);
+}
+
+export function saveAiGenerationDraft(
+  userId: string,
+  data: AiGenerationDraftStorage,
+) {
   if (typeof window === "undefined") return;
-  window.localStorage.removeItem(STORAGE_KEY);
+  window.localStorage.setItem(getDraftStorageKey(userId), JSON.stringify(data));
+}
+
+export function clearAiGenerationDraft(userId: string) {
+  if (typeof window === "undefined") return;
+  window.localStorage.removeItem(getDraftStorageKey(userId));
 }
