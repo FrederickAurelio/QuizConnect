@@ -20,7 +20,7 @@ import { Input } from "@/components/ui/input";
 import { useLogin } from "@/contexts/login-context";
 import { handleGeneralError, handleGeneralSuccess } from "@/lib/axios";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { AxiosError } from "axios";
 import { Binary, Loader2, Lock, LockKeyhole, Mail, User } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -96,6 +96,7 @@ type FormData = LoginFormData | RegisterFormData | ForgotFormData;
 
 function LoginDialog({ open, onOpenChange }: Props) {
   const { setUser, closeLogin } = useLogin();
+  const queryClient = useQueryClient();
   const [option, setOption] = useState<"login" | "register" | "forgot">(
     "register",
   );
@@ -118,12 +119,15 @@ function LoginDialog({ open, onOpenChange }: Props) {
     },
   });
 
-  const handleSuccess = (data: ProfileUserResponse) => {
+  const handleSuccess = async (data: ProfileUserResponse) => {
     toast.success(data.message ?? "Logged in successfully");
     closeLogin();
 
     const user = data.data;
     if (!user) return;
+
+    await queryClient.cancelQueries();
+    queryClient.clear();
 
     const typeUser = user?.userId.startsWith("guest_") ? "guest" : "auth";
     setUser({

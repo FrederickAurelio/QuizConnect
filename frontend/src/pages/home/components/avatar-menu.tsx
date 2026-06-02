@@ -23,13 +23,12 @@ function AvatarMenu() {
 
   const logoutMutation = useMutation({
     mutationFn: logoutUser,
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
+      await queryClient.cancelQueries();
+      queryClient.clear();
+      clearUser();
       navigate("/");
-      setTimeout(() => {
-        clearUser();
-        queryClient.invalidateQueries({ queryKey: ["currentUser"] });
-        handleGeneralSuccess(data);
-      }, 100);
+      handleGeneralSuccess(data);
     },
     onError: handleGeneralError,
   });
