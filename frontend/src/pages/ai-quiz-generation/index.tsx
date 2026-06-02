@@ -6,11 +6,14 @@ import {
   deletePreparedMaterial,
   prepareMaterial,
   validatePreparedChunks,
+  type AiGenerationSettings,
   type GenerationItem,
   type PreparedMaterial,
 } from "@/api/ai-quiz-generation";
 import { Button } from "@/components/ui/button";
+import { useLogin } from "@/contexts/login-context";
 import {
+  clearAiGenerationDraft,
   DEFAULT_AI_SETTINGS,
   loadAiGenerationDraft,
   saveAiGenerationDraft,
@@ -27,7 +30,7 @@ import PreparedMaterialsList from "@/pages/ai-quiz-generation/components/Prepare
 import UploadPanel from "@/pages/ai-quiz-generation/components/UploadPanel";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bot, Loader2 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
 
@@ -46,15 +49,17 @@ function initialMaterials(
 export default function AiQuizGenerationPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [initialDraft] = useState(() => loadAiGenerationDraft());
-
-  const [promptText, setPromptText] = useState(() => initialDraft?.promptText ?? "");
-  const [settings, setSettings] = useState(
-    () => initialDraft?.settings ?? DEFAULT_AI_SETTINGS,
-  );
-  const [preparedMaterials, setPreparedMaterials] = useState<PreparedMaterial[]>(() =>
-    initialMaterials(initialDraft),
-  );
+  const { user, isPending: isAuthPending } = useLogin();
+  const userId = user?.userId ?? null;
+  const [promptText, setPromptText] = useState("");
+  const [settings, setSettings] = useState<AiGenerationSettings>({
+    ...DEFAULT_AI_SETTINGS,
+  });
+  const [preparedMaterials, setPreparedMaterials] = useState<
+    PreparedMaterial[]
+  >([]);
+  const [hasHydratedUserDraft, setHasHydratedUserDraft] = useState(false);
+  const previousUserIdRef = useRef<string | null>(null);
 
   const generationsQuery = useQuery({
     queryKey: ["ai-quiz-generations"],
@@ -84,12 +89,15 @@ export default function AiQuizGenerationPage() {
   useEffect(() => {
     const detail = generationDetailQuery.data;
     if (!detail) return;
-    queryClient.setQueryData(["ai-quiz-generations"], (old: GenerationItem[]) => {
-      if (!old) return old;
-      return old.map((item) =>
-        item.generationId === detail.generationId ? detail : item,
-      );
-    });
+    queryClient.setQueryData(
+      ["ai-quiz-generations"],
+      (old: GenerationItem[]) => {
+        if (!old) return old;
+        return old.map((item) =>
+          item.generationId === detail.generationId ? detail : item,
+        );
+      },
+    );
     if (detail.status === "DONE") {
       toast.success("Quiz generation completed.");
     }
@@ -99,15 +107,50 @@ export default function AiQuizGenerationPage() {
   }, [generationDetailQuery.data, queryClient]);
 
   useEffect(() => {
-    saveAiGenerationDraft({ promptText, settings, preparedMaterials });
-  }, [promptText, settings, preparedMaterials]);
+    if (isAuthPending) return;
+
+    const previousUserId = previousUserIdRef.current;
+    const hasUserChanged = previousUserId !== userId;
+    previousUserIdRef.current = userId;
+
+    if (!userId) {
+      if (hasUserChanged) {
+        setPromptText("");
+        setSettings({ ...DEFAULT_AI_SETTINGS });
+        setPreparedMaterials([]);
+      }
+      setHasHydratedUserDraft(false);
+      return;
+    }
+
+    if (!hasHydratedUserDraft || hasUserChanged) {
+      const draft = loadAiGenerationDraft(userId);
+      setPromptText(draft?.promptText ?? "");
+      setSettings(draft?.settings ?? { ...DEFAULT_AI_SETTINGS });
+      setPreparedMaterials(initialMaterials(draft));
+      setHasHydratedUserDraft(true);
+    }
+  }, [isAuthPending, userId, hasHydratedUserDraft]);
+
+  useEffect(() => {
+    if (isAuthPending || !userId || !hasHydratedUserDraft) return;
+    saveAiGenerationDraft(userId, { promptText, settings, preparedMaterials });
+  }, [
+    isAuthPending,
+    userId,
+    hasHydratedUserDraft,
+    promptText,
+    settings,
+    preparedMaterials,
+  ]);
 
   const prepareMutation = useMutation({
     mutationFn: (file: File) => prepareMaterial(file),
     onSuccess: (material) => {
       if (material.status === "FAILED") {
         toast.error(
-          material.errorMessage ?? "Could not read this file. Try another PDF or TXT.",
+          material.errorMessage ??
+            "Could not read this file. Try another PDF or TXT.",
         );
         return;
       }
@@ -119,13 +162,17 @@ export default function AiQuizGenerationPage() {
     },
     onError: (err) => {
       toast.error(
-        err instanceof Error ? err.message : "Could not prepare file. Please try again.",
+        err instanceof Error
+          ? err.message
+          : "Could not prepare file. Please try again.",
       );
     },
   });
 
   const removePreparedMaterial = (preparedFileId: string) => {
-    setPreparedMaterials((prev) => prev.filter((p) => p.preparedFileId !== preparedFileId));
+    setPreparedMaterials((prev) =>
+      prev.filter((p) => p.preparedFileId !== preparedFileId),
+    );
     void deletePreparedMaterial(preparedFileId).catch(() => {
       /* UX: optimistic remove; TTL cleans up server-side */
     });
@@ -134,17 +181,18 @@ export default function AiQuizGenerationPage() {
   const createGenerationMutation = useMutation({
     mutationFn: createGeneration,
     onSuccess: (created) => {
-      queryClient.setQueryData(["ai-quiz-generations"], (old: GenerationItem[]) => {
-        return [created, ...(old ?? [])];
-      });
+      queryClient.setQueryData(
+        ["ai-quiz-generations"],
+        (old: GenerationItem[]) => {
+          return [created, ...(old ?? [])];
+        },
+      );
       setPromptText("");
       setSettings({ ...DEFAULT_AI_SETTINGS });
       setPreparedMaterials([]);
-      saveAiGenerationDraft({
-        promptText: "",
-        settings: { ...DEFAULT_AI_SETTINGS },
-        preparedMaterials: [],
-      });
+      if (userId) {
+        clearAiGenerationDraft(userId);
+      }
       toast.success("Generation started.");
     },
     onError: (err) =>
@@ -156,15 +204,20 @@ export default function AiQuizGenerationPage() {
   const deleteGenerationMutation = useMutation({
     mutationFn: (generationId: string) => deleteGeneration(generationId),
     onSuccess: (_data, generationId) => {
-      queryClient.setQueryData(["ai-quiz-generations"], (old: GenerationItem[]) => {
-        if (!old) return old;
-        return old.filter((item) => item.generationId !== generationId);
-      });
+      queryClient.setQueryData(
+        ["ai-quiz-generations"],
+        (old: GenerationItem[]) => {
+          if (!old) return old;
+          return old.filter((item) => item.generationId !== generationId);
+        },
+      );
       toast.success("Generation history deleted.");
     },
     onError: (err) =>
       toast.error(
-        err instanceof Error ? err.message : "Could not delete generation history.",
+        err instanceof Error
+          ? err.message
+          : "Could not delete generation history.",
       ),
   });
 
@@ -180,7 +233,9 @@ export default function AiQuizGenerationPage() {
       : "";
 
   const generationDisabled =
-    !hasPreparedFiles || !!activeGeneration || createGenerationMutation.isPending;
+    !hasPreparedFiles ||
+    !!activeGeneration ||
+    createGenerationMutation.isPending;
 
   const onPickFile = (file: File) => {
     if (preparedMaterials.length >= MAX_PREPARED_MATERIALS) {
@@ -192,7 +247,9 @@ export default function AiQuizGenerationPage() {
       return;
     }
     if (file.size > MAX_PREPARED_FILE_BYTES) {
-      toast.error(`File too large. Maximum is ${MAX_PREPARED_FILE_LABEL} per file.`);
+      toast.error(
+        `File too large. Maximum is ${MAX_PREPARED_FILE_LABEL} per file.`,
+      );
       return;
     }
     prepareMutation.mutate(file);
@@ -206,19 +263,25 @@ export default function AiQuizGenerationPage() {
       await validatePreparedChunks(ids);
     } catch (e) {
       toast.error(
-        e instanceof Error ? e.message : "Prepared material could not be validated.",
+        e instanceof Error
+          ? e.message
+          : "Prepared material could not be validated.",
       );
       return;
     }
     createGenerationMutation.mutate({
       preparedFileIds: ids,
-      promptText: trimmedPrompt || "Generate a balanced quiz from the material.",
+      promptText:
+        trimmedPrompt || "Generate a balanced quiz from the material.",
       settings,
     });
   };
 
   const isAnyPending =
-    generationsQuery.isPending || generationsQuery.isFetching || isPreparingFile;
+    generationsQuery.isPending ||
+    generationsQuery.isFetching ||
+    isPreparingFile ||
+    isAuthPending;
 
   return (
     <div className="scroll-primary flex h-full w-full flex-col gap-5 overflow-y-auto px-4 py-4">
@@ -231,8 +294,8 @@ export default function AiQuizGenerationPage() {
             <div>
               <h1 className="text-xl font-bold">AI Quiz Generation</h1>
               <p className="text-sm text-white/55">
-                Upload up to 3 materials, set rules, then generate quiz drafts on the
-                server.
+                Upload up to 3 materials, set rules, then generate quiz drafts
+                on the server.
               </p>
             </div>
           </div>
@@ -247,7 +310,11 @@ export default function AiQuizGenerationPage() {
                 Ready
               </span>
             )}
-            <Button size="sm" variant="outline" onClick={() => navigate("/quiz-set")}>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => navigate("/quiz-set")}
+            >
               Back to Library
             </Button>
           </div>
@@ -255,7 +322,7 @@ export default function AiQuizGenerationPage() {
       </div>
 
       {/* Step 1 + 2: two columns on large screens */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:gap-6 lg:items-start">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:items-start lg:gap-6">
         <div className="min-w-0 space-y-4">
           <UploadPanel
             disabled={uploadSectionDisabled}
@@ -284,9 +351,11 @@ export default function AiQuizGenerationPage() {
       </div>
 
       {/* Generation history: full width under the two steps */}
-      <section className="border-border space-y-2 border-t pt-4 mt-3">
+      <section className="border-border mt-3 space-y-2 border-t pt-4">
         <div className="flex flex-wrap items-end justify-between gap-2">
-          <h2 className="text-lg pl-1 font-bold tracking-tight">Generation history</h2>
+          <h2 className="pl-1 text-lg font-bold tracking-tight">
+            Generation history
+          </h2>
           {isAnyPending && (
             <span className="text-xs text-white/45">Refreshing…</span>
           )}
