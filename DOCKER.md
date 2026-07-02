@@ -173,7 +173,6 @@ Flow: **Browser → Nginx (80) → static or proxy to Express (2000)**. Same spl
 ## 7. Production notes
 
 - Use strong `SESSION_SECRET` and `COOKIE_SECRET`; keep `backend/.env.local` out of git (it’s in backend’s .gitignore).
-- For a custom domain, set `CORS_ORIGIN` to your frontend origin (e.g. `https://yourdomain.com`).
 - Data is in volumes `mongo_data` and `redis_data`; back them up if needed.
 - For HTTPS, put Nginx or another reverse proxy in front with TLS.
 
@@ -217,9 +216,8 @@ The backend already uses defaults that match local dev:
 
 - `MONGODB_URI` → `mongodb://localhost:27017/QuizzConnect`
 - `REDIS_URL` → `redis://localhost:6379`
-- `CORS_ORIGIN` → `http://localhost:3221`
 
-So you **don’t** put these in `.env.local` for dev or remove them for prod. In **local dev** the code defaults are used. In **Docker** (full stack), `docker-compose.yml` sets `MONGODB_URI`, `REDIS_URL`, `CORS_ORIGIN` for the app container, so they override automatically.
+So you **don’t** put these in `.env.local` for dev or remove them for prod. In **local dev** the code defaults are used. In **Docker** (full stack), `docker-compose.yml` sets `MONGODB_URI` and `REDIS_URL` for the app container, so they override automatically.
 
 In `backend/.env.local` you only need your **secrets** (e.g. `SESSION_SECRET`, `COOKIE_SECRET`) and any optional stuff (e.g. Brevo). Same file for both dev and Docker.
 
@@ -345,7 +343,7 @@ ssh your-user@your-vps-ip
    - Set `SESSION_SECRET` and `COOKIE_SECRET` to long random strings.
    - Optionally set `BREVO_API_KEY`, `SENDER_EMAIL`, etc.
 
-   Leave `PORT`, `MONGODB_URI`, `REDIS_URL`, `CORS_ORIGIN` as defaults unless you know why you’re changing them.
+   Leave `PORT`, `MONGODB_URI`, and `REDIS_URL` as defaults unless you know why you’re changing them.
 
 #### 9.2.2 Bind this app to its own port (e.g. 8085)
 

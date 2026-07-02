@@ -4,11 +4,6 @@ import { setupLobbySocket, startLobbyTimeoutWorker } from "./lobby-socket.js";
 
 export const setupSocket = (httpServer: HttpServer) => {
   const io = new Server(httpServer, {
-    cors: {
-      origin: "http://localhost:3221",
-      credentials: true,
-    },
-    // Ensure the server is listening for the path Vite is proxying
     path: "/socket.io",
   });
 

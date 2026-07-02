@@ -92,7 +92,7 @@
    - `SESSION_SECRET` (min 32 chars)
    - `COOKIE_SECRET`
 
-   Optional: `MONGODB_URI`, `REDIS_URL`, `CORS_ORIGIN`, `PORT`. See `backend/.env` for Brevo email vars.
+   Optional: `MONGODB_URI`, `REDIS_URL`, `PORT`. See `backend/.env` for Brevo email vars.
 
 3. **Start MongoDB and Redis** (e.g. with Docker)
 
@@ -137,7 +137,6 @@
 | `PORT`           | No       | Server port (default `2000`)                                                 |
 | `MONGODB_URI`    | No       | MongoDB connection string (default `mongodb://localhost:27017/QuizzConnect`) |
 | `REDIS_URL`      | No       | Redis connection string (default `redis://localhost:6379`)                   |
-| `CORS_ORIGIN`    | No       | Allowed origin for API/cookies (default `http://localhost:3221`)             |
 | `COOKIE_SECURE`  | No       | Set to `true` when behind HTTPS                                              |
 | `BREVO_API_KEY`  | No       | Brevo API key for email (e.g. verification)                                  |
 | `SENDER_EMAIL`   | No       | Sender address for Brevo                                                     |

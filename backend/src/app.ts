@@ -4,7 +4,6 @@ import session from "express-session";
 import mongoose from "mongoose";
 import MongoStore from "connect-mongo";
 import cookieParser from "cookie-parser";
-import cors from "cors";
 import dotenv from "dotenv";
 import authRoute from "./api/auth/router.js";
 import quizRouter from "./api/quiz/router.js";
@@ -46,22 +45,6 @@ const SESSION_STORE_TTL_SECONDS = Math.max(
 );
 
 const server = http.createServer(app);
-
-const corsOrigin = process.env.CORS_ORIGIN || "http://localhost:3221";
-app.use(
-  cors({
-    origin: corsOrigin,
-    methods: ["GET", "POST", "DELETE", "PUT"],
-    allowedHeaders: [
-      "Content-Type",
-      "Authorization",
-      "Cache-Control",
-      "Expires",
-      "Pragma",
-    ],
-    credentials: true,
-  }),
-);
 
 app.use(express.json());
 app.use(cookieParser(process.env.COOKIE_SECRET));
