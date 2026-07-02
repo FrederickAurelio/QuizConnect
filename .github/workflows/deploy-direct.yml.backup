@@ -6,10 +6,16 @@ name: Deploy to VPS
 on:
   push:
     branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-vps
+  cancel-in-progress: true
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3
@@ -17,10 +23,11 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script_stop: true
+          command_timeout: 30m
           script: |
             set -e
             cd ~/QuizConnect
             git fetch origin
             git reset --hard origin/main
             docker compose -f docker-compose.yml up -d --build
+
