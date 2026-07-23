@@ -1,8 +1,18 @@
+# Deploy via GHCR: build/push on GitHub, pull on VPS (no build on VPS).
+# Storage-friendly: only :latest + :previous tags on GHCR and on the VPS.
+# Secrets: VPS_HOST, SSH_USER, SSH_PRIVATE_KEY.
+# Swap with deploy.yml when you want GHCR instead of direct VPS builds.
+
 name: Deploy to VPS
 
 on:
   push:
     branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-vps
+  cancel-in-progress: true
 
 env:
   REGISTRY: ghcr.io
@@ -10,6 +20,7 @@ env:
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     permissions:
       contents: read
       packages: write
@@ -28,6 +39,27 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # Move current :latest → :previous before overwriting (same pattern as direct deploy).
+      - name: Promote backend latest to previous
+        run: |
+          IMG="${{ env.REGISTRY }}/${{ steps.meta.outputs.owner }}/quizgame-backend"
+          if docker pull "${IMG}:latest"; then
+            docker tag "${IMG}:latest" "${IMG}:previous"
+            docker push "${IMG}:previous"
+          else
+            echo "No existing backend:latest yet; skip previous promote."
+          fi
+
+      - name: Promote frontend latest to previous
+        run: |
+          IMG="${{ env.REGISTRY }}/${{ steps.meta.outputs.owner }}/quizgame-web"
+          if docker pull "${IMG}:latest"; then
+            docker tag "${IMG}:latest" "${IMG}:previous"
+            docker push "${IMG}:previous"
+          else
+            echo "No existing web:latest yet; skip previous promote."
+          fi
+
       - name: Build and push backend
         uses: docker/build-push-action@v6
         with:
@@ -36,7 +68,6 @@ jobs:
           push: true
           tags: |
             ${{ env.REGISTRY }}/${{ steps.meta.outputs.owner }}/quizgame-backend:latest
-            ${{ env.REGISTRY }}/${{ steps.meta.outputs.owner }}/quizgame-backend:${{ github.sha }}
 
       - name: Build and push frontend
         uses: docker/build-push-action@v6
@@ -46,11 +77,31 @@ jobs:
           push: true
           tags: |
             ${{ env.REGISTRY }}/${{ steps.meta.outputs.owner }}/quizgame-web:latest
-            ${{ env.REGISTRY }}/${{ steps.meta.outputs.owner }}/quizgame-web:${{ github.sha }}
 
+      # Drop digests no longer referenced by latest/previous (GHCR storage).
+      - name: Delete untagged backend package versions
+        uses: actions/delete-package-versions@v5
+        continue-on-error: true
+        with:
+          package-name: quizgame-backend
+          package-type: container
+          delete-only-untagged-versions: true
+          min-versions-to-keep: 0
+
+      - name: Delete untagged frontend package versions
+        uses: actions/delete-package-versions@v5
+        continue-on-error: true
+        with:
+          package-name: quizgame-web
+          package-type: container
+          delete-only-untagged-versions: true
+          min-versions-to-keep: 0
+
+  # Pull on a slow VPS (~3 Mbps) can take a long time; allow up to the job max.
   deploy:
     runs-on: ubuntu-latest
     needs: build-and-push
+    timeout-minutes: 360
     steps:
       - name: Set image owner
         id: meta
@@ -62,13 +113,50 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
+          # Slow image pulls over ~3 Mbps; keep SSH session open as long as the job allows.
+          command_timeout: 6h
           script_stop: true
           script: |
             set -e
             cd ~/QuizConnect
             git fetch origin
             git reset --hard origin/main
-            export IMAGE_BACKEND=ghcr.io/${{ steps.meta.outputs.owner }}/quizgame-backend:${{ github.sha }}
-            export IMAGE_WEB=ghcr.io/${{ steps.meta.outputs.owner }}/quizgame-web:${{ github.sha }}
+
+            OWNER="${{ steps.meta.outputs.owner }}"
+            BACKEND="ghcr.io/${OWNER}/quizgame-backend"
+            WEB="ghcr.io/${OWNER}/quizgame-web"
+
+            # Keep currently running images as :previous before pull (VPS-local safety net).
+            if docker inspect quizzconnect-app >/dev/null 2>&1; then
+              docker tag "$(docker inspect -f '{{.Image}}' quizzconnect-app)" "${BACKEND}:previous" || true
+            fi
+            if docker inspect quizzconnect-web >/dev/null 2>&1; then
+              docker tag "$(docker inspect -f '{{.Image}}' quizzconnect-web)" "${WEB}:previous" || true
+            fi
+
+            # Docker/Compose client timeouts (seconds) — avoid aborting idle stretches on slow pulls.
+            export DOCKER_CLIENT_TIMEOUT=3600
+            export COMPOSE_HTTP_TIMEOUT=3600
+
+            export IMAGE_BACKEND="${BACKEND}:latest"
+            export IMAGE_WEB="${WEB}:latest"
             docker compose -f docker-compose.yml -f docker-compose.ci.yml pull
             docker compose -f docker-compose.yml -f docker-compose.ci.yml up -d
+
+            # Keep only :latest + :previous for GHCR app images; prune the rest.
+            for img in "${BACKEND}" "${WEB}"; do
+              docker images --format '{{.Repository}}:{{.Tag}}' | while read -r ref; do
+                case "$ref" in
+                  ${img}:latest|${img}:previous) ;;
+                  ${img}:*) docker rmi "$ref" || true ;;
+                esac
+              done
+            done
+            # Also drop leftover direct-build tags if this VPS previously used that flow.
+            for img in quizconnect-app quizconnect-web; do
+              docker images --format '{{.Repository}}:{{.Tag}}' "$img" 2>/dev/null | while read -r ref; do
+                docker rmi "$ref" || true
+              done
+            done
+            docker image prune -f
+            docker container prune -f

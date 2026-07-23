@@ -13,6 +13,11 @@ services:
       timeout: 5s
       retries: 5
       start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   redis:
     image: redis:7-alpine
@@ -25,8 +30,14 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   app:
+    image: quizconnect-app:latest
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -50,8 +61,14 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   web:
+    image: quizconnect-web:latest
     build:
       context: ./frontend
       dockerfile: Dockerfile
@@ -61,6 +78,11 @@ services:
       - "3221:80"
     depends_on:
       - app
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 volumes:
   mongo_data:

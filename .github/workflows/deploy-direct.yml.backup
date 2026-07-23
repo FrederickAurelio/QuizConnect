@@ -1,5 +1,7 @@
 # Deploy by pulling code and building directly on VPS.
 # Secrets: VPS_HOST, SSH_USER, SSH_PRIVATE_KEY.
+# Disk hygiene: keep quizconnect-*:latest + :previous, prune dangling images,
+# stopped containers, and cap BuildKit cache at 2GB.
 
 name: Deploy to VPS
 
@@ -29,5 +31,25 @@ jobs:
             cd ~/QuizConnect
             git fetch origin
             git reset --hard origin/main
+
+            # Keep previous generation for one-step rollback (latest → previous).
+            for img in quizconnect-app quizconnect-web; do
+              if docker image inspect "${img}:latest" >/dev/null 2>&1; then
+                docker tag "${img}:latest" "${img}:previous"
+              fi
+            done
+
             docker compose -f docker-compose.yml up -d --build
 
+            # Drop any extra tags beyond latest/previous, then prune junk.
+            for img in quizconnect-app quizconnect-web; do
+              docker images --format '{{.Repository}}:{{.Tag}}' "$img" | while read -r ref; do
+                case "$ref" in
+                  *:latest|*:previous) ;;
+                  *) docker rmi "$ref" || true ;;
+                esac
+              done
+            done
+            docker image prune -f
+            docker container prune -f
+            docker builder prune -f --keep-storage 2GB
