@@ -31,10 +31,12 @@ export async function completeChatJson(params: {
 
   const model = params.model ?? OPENROUTER_MODEL;
 
+  const responseFormat = { type: "json_object" as const };
+
   logExplain("OpenRouter: outgoing request", {
     url: OPENROUTER_URL,
     model,
-    // response_format: "json_object",
+    response_format: responseFormat,
     messages: params.messages.map((m) => ({
       role: m.role,
       contentLength: m.content.length,
@@ -59,7 +61,7 @@ export async function completeChatJson(params: {
     body: JSON.stringify({
       model,
       messages: params.messages,
-      // response_format: "json_object",
+      response_format: responseFormat,
     }),
   });
 
