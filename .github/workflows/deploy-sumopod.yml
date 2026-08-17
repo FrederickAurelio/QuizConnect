@@ -139,8 +139,18 @@ jobs:
 
             export IMAGE_BACKEND="${BACKEND}:latest"
             export IMAGE_WEB="${WEB}:latest"
-            docker-compose -f docker-compose.sumopod.yml -f docker-compose.ci.yml pull
-            docker-compose -f docker-compose.sumopod.yml -f docker-compose.ci.yml up -d
+
+            # Ubuntu 24 apt docker-compose is 1.29.2 (Python v1). It crashes on
+            # Docker Engine 25+ with KeyError: ContainerConfig during recreate.
+            # Install the official Compose v2+ CLI plugin if `docker compose` is missing.
+            if ! docker compose version >/dev/null 2>&1; then
+              mkdir -p "${HOME}/.docker/cli-plugins"
+              curl -fsSL "https://github.com/docker/compose/releases/download/v5.4.0/docker-compose-linux-$(uname -m)" \
+                -o "${HOME}/.docker/cli-plugins/docker-compose"
+              chmod +x "${HOME}/.docker/cli-plugins/docker-compose"
+            fi
+            docker compose -f docker-compose.sumopod.yml -f docker-compose.ci.yml pull
+            docker compose -f docker-compose.sumopod.yml -f docker-compose.ci.yml up -d
 
             docker images --format '{{.Repository}}:{{.Tag}}' \
               | grep -E 'quizgame-backend:|quizgame-web:' \
