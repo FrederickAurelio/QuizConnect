@@ -150,7 +150,10 @@ jobs:
               chmod +x "${HOME}/.docker/cli-plugins/docker-compose"
             fi
             docker compose -f docker-compose.sumopod.yml -f docker-compose.ci.yml pull
-            docker compose -f docker-compose.sumopod.yml -f docker-compose.ci.yml up -d
+            # Compose v1 recreate leftovers are named {id}_quizzconnect-*; they block v2 up.
+            docker ps -aq --filter name=_quizzconnect-app | xargs -r docker rm -f || true
+            docker ps -aq --filter name=_quizzconnect-web | xargs -r docker rm -f || true
+            docker compose -f docker-compose.sumopod.yml -f docker-compose.ci.yml up -d --remove-orphans
 
             docker images --format '{{.Repository}}:{{.Tag}}' \
               | grep -E 'quizgame-backend:|quizgame-web:' \
