@@ -1,3 +1,4 @@
+import PageSeo from "@/components/page-seo";
 import { useEditProfile } from "@/contexts/edit-profile-context";
 import { useLogin } from "@/contexts/login-context";
 import EditProfileDialog from "@/pages/home/components/edit-profile-dialog";
@@ -10,12 +11,13 @@ function Layout() {
   const { isEditProfileDialogOpen, closeProfileEdit } = useEditProfile();
   return (
     <div className="flex h-dvh flex-col overflow-hidden">
+      <PageSeo />
       <Header />
-      <div className="flex min-h-0 w-full flex-1 flex-col items-center">
+      <main className="flex min-h-0 w-full flex-1 flex-col items-center">
         <div className="min-h-0 w-full max-w-[1200px] flex-1">
           <Outlet />
         </div>
-      </div>
+      </main>
       <LoginDialog
         open={isLoginDialogOpen}
         onOpenChange={(o) => {

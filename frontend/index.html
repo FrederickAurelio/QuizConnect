@@ -1,16 +1,135 @@
 <!doctype html>
 <html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#14101c" />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
 
-<head>
-  <meta charset="UTF-8" />
-  <link rel="icon" type="image/svg+xml" href="/gamepad.svg" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>QuizConnect</title>
-</head>
+    <title>QuizConnect | Live Multiplayer Quizzes</title>
+    <meta
+      name="description"
+      content="Host live multiplayer quizzes, join with a 6-digit code, and compete on a real-time leaderboard. Create your own quiz or generate one with AI."
+    />
+    <meta name="application-name" content="QuizConnect" />
+    <meta name="apple-mobile-web-app-title" content="QuizConnect" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="format-detection" content="telephone=no" />
+    <meta
+      name="robots"
+      content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1"
+    />
+    <link rel="canonical" href="https://quizconnect.online/" />
 
-<body>
-  <div id="root"></div>
-  <script type="module" src="/src/main.tsx"></script>
-</body>
+    <link rel="icon" type="image/svg+xml" href="/gamepad.svg" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="image_src" href="https://quizconnect.online/og-image.jpg" />
 
+    <!-- Open Graph: WhatsApp, Facebook, LinkedIn, Discord, iMessage -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="QuizConnect" />
+    <meta property="og:locale" content="en_US" />
+    <meta property="og:url" content="https://quizconnect.online/" />
+    <meta
+      property="og:title"
+      content="QuizConnect | Live Multiplayer Quizzes"
+    />
+    <meta
+      property="og:description"
+      content="Host live multiplayer quizzes, join with a 6-digit code, and compete on a real-time leaderboard. Create your own quiz or generate one with AI."
+    />
+    <meta
+      property="og:image"
+      content="https://quizconnect.online/og-image.jpg"
+    />
+    <meta
+      property="og:image:secure_url"
+      content="https://quizconnect.online/og-image.jpg"
+    />
+    <meta property="og:image:type" content="image/jpeg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta
+      property="og:image:alt"
+      content="QuizConnect — host live quizzes and play with friends in real time"
+    />
+
+    <!-- X / Twitter. Discord also uses twitter:card for the large embed. -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta
+      name="twitter:title"
+      content="QuizConnect | Live Multiplayer Quizzes"
+    />
+    <meta
+      name="twitter:description"
+      content="Host live multiplayer quizzes, join with a 6-digit code, and compete on a real-time leaderboard. Create your own quiz or generate one with AI."
+    />
+    <meta
+      name="twitter:image"
+      content="https://quizconnect.online/og-image.jpg"
+    />
+    <meta
+      name="twitter:image:alt"
+      content="QuizConnect — host live quizzes and play with friends in real time"
+    />
+
+    <meta itemprop="name" content="QuizConnect | Live Multiplayer Quizzes" />
+    <meta
+      itemprop="description"
+      content="Host live multiplayer quizzes, join with a 6-digit code, and compete on a real-time leaderboard. Create your own quiz or generate one with AI."
+    />
+    <meta itemprop="image" content="https://quizconnect.online/og-image.jpg" />
+
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "WebSite",
+            "@id": "https://quizconnect.online/#website",
+            "url": "https://quizconnect.online/",
+            "name": "QuizConnect",
+            "description": "Host live multiplayer quizzes, join with a 6-digit code, and compete on a real-time leaderboard. Create your own quiz or generate one with AI.",
+            "inLanguage": "en",
+            "publisher": { "@id": "https://quizconnect.online/#app" }
+          },
+          {
+            "@type": "WebApplication",
+            "@id": "https://quizconnect.online/#app",
+            "name": "QuizConnect",
+            "url": "https://quizconnect.online/",
+            "image": "https://quizconnect.online/og-image.jpg",
+            "description": "Host live multiplayer quizzes, join with a 6-digit code, and compete on a real-time leaderboard. Create your own quiz or generate one with AI.",
+            "applicationCategory": "GameApplication",
+            "operatingSystem": "Any",
+            "browserRequirements": "Requires JavaScript",
+            "offers": {
+              "@type": "Offer",
+              "price": "0",
+              "priceCurrency": "USD"
+            }
+          }
+        ]
+      }
+    </script>
+  </head>
+
+  <body>
+    <div id="root"></div>
+    <noscript>
+      <main>
+        <h1>QuizConnect</h1>
+        <p>
+          Host live multiplayer quizzes, join with a 6-digit code, and compete
+          on a real-time leaderboard.
+        </p>
+        <p>Please enable JavaScript to play.</p>
+      </main>
+    </noscript>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
 </html>

@@ -4,7 +4,7 @@ import { useLogin } from "@/contexts/login-context";
 import AvatarMenu from "@/pages/home/components/avatar-menu";
 import { ArrowLeft, Gamepad } from "lucide-react";
 import { useState } from "react";
-import { useLocation, useNavigate } from "react-router";
+import { Link, useLocation, useNavigate } from "react-router";
 import { toast } from "sonner";
 
 function Header() {
@@ -31,7 +31,7 @@ function Header() {
   };
 
   return (
-    <div className="border-border relative mx-10 flex h-20 shrink-0 items-center justify-center gap-1 border-b max-sm:mx-0 max-sm:justify-between">
+    <header className="border-border relative mx-10 flex h-20 shrink-0 items-center justify-center gap-1 border-b max-sm:mx-0 max-sm:justify-between">
       <div className="absolute left-14 max-sm:relative max-sm:left-4">
         <button
           className="hover:text-primary border-border text-secondary-foreground bg-card flex size-9 items-center justify-center gap-2 rounded-lg border-2 text-xl hover:scale-105 hover:shadow-2xl"
@@ -47,15 +47,22 @@ function Header() {
         </button>
       </div>
 
-      <div
-        className="flex items-center gap-1 max-sm:flex-col max-sm:gap-0 max-sm:-translate-y-1 "
-        onClick={handleClickLogo}
+      <Link
+        to="/"
+        aria-label="QuizConnect home"
+        className="flex cursor-pointer items-center gap-1 max-sm:-translate-y-1 max-sm:flex-col max-sm:gap-0"
+        onClick={(e) => {
+          if (location.pathname.startsWith("/game")) {
+            e.preventDefault();
+            handleClickLogo();
+          }
+        }}
       >
         <Gamepad className="text-primary size-12 -translate-y-px max-sm:size-10" />
-        <h1 className="text-secondary-foreground cursor-default text-3xl font-semibold max-sm:text-sm max-sm:leading-1">
+        <span className="text-secondary-foreground text-3xl font-semibold max-sm:text-sm max-sm:leading-1">
           <span className="text-primary">Quiz</span>Connect
-        </h1>
-      </div>
+        </span>
+      </Link>
 
       <div className="absolute right-10 max-sm:relative max-sm:right-4">
         {isAuthenticated ? (
@@ -96,7 +103,7 @@ function Header() {
           </div>
         </DialogContent>
       </Dialog>
-    </div>
+    </header>
   );
 }
 
