@@ -1,0 +1,155 @@
+# Deploy to the new Sumopod VPS via GHCR (build/push on GitHub, pull on VPS).
+# Same flow as deploy.yml.backup — new secret names so the old VPS keeps working.
+#
+# Add these in GitHub → repo → Settings → Secrets and variables → Actions:
+#   VPS_HOST_SUMOPOD         VPS IP
+#   SSH_USER_SUMOPOD         didik
+#   SSH_PRIVATE_KEY_SUMOPOD  contents of ~/.ssh/id_ed25519_sumopod (private key)
+#
+# On the VPS, clone once first:
+#   git clone git@github.com:OWNER/QuizGame.git ~/QuizGame
+
+name: Deploy to Sumopod VPS
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-sumopod
+  cancel-in-progress: true
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set image owner (lowercase for Docker)
+        id: meta
+        run: echo "owner=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Promote backend latest to previous
+        run: |
+          IMG="${{ env.REGISTRY }}/${{ steps.meta.outputs.owner }}/quizgame-backend"
+          if docker pull "${IMG}:latest"; then
+            docker tag "${IMG}:latest" "${IMG}:previous"
+            docker push "${IMG}:previous"
+          else
+            echo "No existing backend:latest yet; skip previous promote."
+          fi
+
+      - name: Promote frontend latest to previous
+        run: |
+          IMG="${{ env.REGISTRY }}/${{ steps.meta.outputs.owner }}/quizgame-web"
+          if docker pull "${IMG}:latest"; then
+            docker tag "${IMG}:latest" "${IMG}:previous"
+            docker push "${IMG}:previous"
+          else
+            echo "No existing web:latest yet; skip previous promote."
+          fi
+
+      - name: Build and push backend
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ steps.meta.outputs.owner }}/quizgame-backend:latest
+
+      - name: Build and push frontend
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ steps.meta.outputs.owner }}/quizgame-web:latest
+
+      - name: Delete untagged backend package versions
+        uses: actions/delete-package-versions@v5
+        continue-on-error: true
+        with:
+          package-name: quizgame-backend
+          package-type: container
+          delete-only-untagged-versions: true
+          min-versions-to-keep: 0
+
+      - name: Delete untagged frontend package versions
+        uses: actions/delete-package-versions@v5
+        continue-on-error: true
+        with:
+          package-name: quizgame-web
+          package-type: container
+          delete-only-untagged-versions: true
+          min-versions-to-keep: 0
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    timeout-minutes: 360
+    steps:
+      - name: Set image owner
+        id: meta
+        run: echo "owner=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST_SUMOPOD }}
+          username: ${{ secrets.SSH_USER_SUMOPOD }}
+          key: ${{ secrets.SSH_PRIVATE_KEY_SUMOPOD }}
+          command_timeout: 6h
+          script_stop: true
+          script: |
+            set -e
+            cd ~/QuizGame
+            git fetch origin
+            git reset --hard origin/main
+
+            OWNER="${{ steps.meta.outputs.owner }}"
+            BACKEND="ghcr.io/${OWNER}/quizgame-backend"
+            WEB="ghcr.io/${OWNER}/quizgame-web"
+
+            if docker inspect quizzconnect-app >/dev/null 2>&1; then
+              docker tag "$(docker inspect -f '{{.Image}}' quizzconnect-app)" "${BACKEND}:previous" || true
+            fi
+            if docker inspect quizzconnect-web >/dev/null 2>&1; then
+              docker tag "$(docker inspect -f '{{.Image}}' quizzconnect-web)" "${WEB}:previous" || true
+            fi
+
+            export DOCKER_CLIENT_TIMEOUT=3600
+            export COMPOSE_HTTP_TIMEOUT=3600
+
+            export IMAGE_BACKEND="${BACKEND}:latest"
+            export IMAGE_WEB="${WEB}:latest"
+            docker compose -f docker-compose.sumopod.yml -f docker-compose.ci.yml pull
+            docker compose -f docker-compose.sumopod.yml -f docker-compose.ci.yml up -d
+
+            for img in "${BACKEND}" "${WEB}"; do
+              docker images --format '{{.Repository}}:{{.Tag}}' | while read -r ref; do
+                case "$ref" in
+                  ${img}:latest|${img}:previous) ;;
+                  ${img}:*) docker rmi "$ref" || true ;;
+                esac
+              done
+            done
+            docker image prune -f
+            docker container prune -f
