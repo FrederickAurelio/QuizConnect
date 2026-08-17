@@ -140,17 +140,10 @@ jobs:
 
             export IMAGE_BACKEND="${BACKEND}:latest"
             export IMAGE_WEB="${WEB}:latest"
-
-            # Ubuntu docker.io often has Compose v1 (docker-compose), not the v2 plugin.
-            compose() {
-              if docker compose version >/dev/null 2>&1; then
-                docker compose "$@"
-              else
-                docker-compose "$@"
-              fi
-            }
-            compose -f docker-compose.sumopod.yml -f docker-compose.ci.yml pull
-            compose -f docker-compose.sumopod.yml -f docker-compose.ci.yml up -d
+            # Ubuntu: Compose v1 binary. Do not use a multiline function — script_stop
+            # injects an exit-code check after every line and aborts the else-branch.
+            docker-compose -f docker-compose.sumopod.yml -f docker-compose.ci.yml pull
+            docker-compose -f docker-compose.sumopod.yml -f docker-compose.ci.yml up -d
 
             for img in "${BACKEND}" "${WEB}"; do
               docker images --format '{{.Repository}}:{{.Tag}}' | while read -r ref; do
