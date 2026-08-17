@@ -117,7 +117,6 @@ jobs:
           username: ${{ secrets.SSH_USER_SUMOPOD }}
           key: ${{ secrets.SSH_PRIVATE_KEY_SUMOPOD }}
           command_timeout: 6h
-          script_stop: true
           script: |
             set -e
             cd ~/QuizGame
@@ -140,18 +139,12 @@ jobs:
 
             export IMAGE_BACKEND="${BACKEND}:latest"
             export IMAGE_WEB="${WEB}:latest"
-            # Ubuntu: Compose v1 binary. Do not use a multiline function — script_stop
-            # injects an exit-code check after every line and aborts the else-branch.
             docker-compose -f docker-compose.sumopod.yml -f docker-compose.ci.yml pull
             docker-compose -f docker-compose.sumopod.yml -f docker-compose.ci.yml up -d
 
-            for img in "${BACKEND}" "${WEB}"; do
-              docker images --format '{{.Repository}}:{{.Tag}}' | while read -r ref; do
-                case "$ref" in
-                  ${img}:latest|${img}:previous) ;;
-                  ${img}:*) docker rmi "$ref" || true ;;
-                esac
-              done
-            done
+            docker images --format '{{.Repository}}:{{.Tag}}' \
+              | grep -E 'quizgame-backend:|quizgame-web:' \
+              | grep -vE ':(latest|previous)$' \
+              | xargs -r docker rmi || true
             docker image prune -f
             docker container prune -f
